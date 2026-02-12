@@ -25,9 +25,9 @@ ansible-playbook ocp/upi/upi_rhosp/ansible/50-ocp-storage-cinder-deploy.yaml \
   -i _local_config/ansible/inventory.yaml \
   -e @_local_config/network.yaml \
   -e @_local_config/${OCP_CLUSTER_NAME}/${OCP_CLUSTER_NAME}.yaml \
-  -e @ocp/upi/ansible/defaults/main.yaml \
-  -e @ocp/4.16/ansible/defaults/main.yaml \
-  -e @ocp/upi/upi_rhosp/ansible/defaults/main.yaml
+  -e @upi/ansible/defaults/main.yaml \
+  -e @4.16/ansible/defaults/main.yaml \
+  -e @upi/upi_rhosp/ansible/defaults/main.yaml
 ----
 
 To test the configuration execute the following configuration that will deploy 
@@ -113,14 +113,14 @@ RHOSP Manila
 
 [source,bash]
 ----
-ansible-playbook ocp/upi/upi_rhosp/ansible/50-ocp-storage-manila.yaml \
+ansible-playbook upi/upi_rhosp/ansible/50-ocp-storage-manila-deploy.yaml \
   -i _local_config/ansible/inventory.yaml \
   -e @_local_config/network.yaml \
   -e @_local_config/${OCP_CLUSTER_NAME}/${OCP_CLUSTER_NAME}.yaml \
-  -e @ocp/upi/ansible/defaults/main.yaml \
-  -e @ocp/4.16/ansible/defaults/main.yaml \
-  -e @ocp/upi/upi_rhosp/ansible/defaults/main.yaml \
-  -e @ocp/upi/upi_rhosp/ansible/defaults/ovhcloud.yaml
+  -e @upi/ansible/defaults/main.yaml \
+  -e @4.16/ansible/defaults/main.yaml \
+  -e @upi/upi_rhosp/ansible/defaults/main.yaml \
+  -e @upi/upi_rhosp/ansible/defaults/ovhcloud.yaml
 ----
 
 To test the configuration execute the following configuration that will deploy 
@@ -149,10 +149,10 @@ ansible-playbook ocp/upi/upi_rhosp/ansible/95-ocp-storage-manila-cleanup.yaml \
   -i _local_config/ansible/inventory.yaml \
   -e @_local_config/network.yaml \
   -e @_local_config/${OCP_CLUSTER_NAME}/${OCP_CLUSTER_NAME}.yaml \
-  -e @ocp/upi/ansible/defaults/main.yaml \
-  -e @ocp/4.16/ansible/defaults/main.yaml \
-  -e @ocp/upi/upi_rhosp/ansible/defaults/main.yaml \
-  -e @ocp/upi/upi_rhosp/ansible/defaults/ovhcloud.yaml
+  -e @upi/ansible/defaults/main.yaml \
+  -e @4.16/ansible/defaults/main.yaml \
+  -e @upi/upi_rhosp/ansible/defaults/main.yaml \
+  -e @upi/upi_rhosp/ansible/defaults/ovhcloud.yaml
 ----
 
 References: 

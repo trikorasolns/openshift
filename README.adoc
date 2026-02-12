@@ -21,9 +21,14 @@ This repository is about deploying and configuring OCP on UPI.
 
 == Acronyms
 
-OCP:: Openshift Container Platform
+OCP::
+RedHat OpenShift Container Platform
 
-UPI:: User Provided Infrastructure
+RHOSP::
+RedHat Open Stack Platform
+
+UPI::
+User-provisioned infrastructure
 
 == Current
 

@@ -19,7 +19,7 @@
     ansible.builtin.fetch:
       src: "{{ openshift_cluster_install_dir }}/worker.ign"
       dest: "/tmp/worker-{{ metadata_json.infraID }}.ign"
-      flat: truec
+      flat: true
 
 - name: "Deploy Compute Node instances"
   # hosts: "{{ ocp_bastion | default('ocp_bastion') | default('localhost') }}"
@@ -30,7 +30,7 @@
 
   - name: "Check if any Compute Node instances exists on RHOSP"
     openstack.cloud.server_info:
-      name: "{{ rhosp_compute_node_server_prefix }}"
+      name: "{{ rhosp_compute_node_server_prefix }}*"
     register: rhosp_computenode_server_info
 
   - name: "Print Compute Node server info"
