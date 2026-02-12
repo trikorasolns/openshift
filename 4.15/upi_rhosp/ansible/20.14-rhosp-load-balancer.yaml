@@ -1,0 +1,201 @@
+---
+- name: "Collect information"
+  import_playbook: _common_rhosp.yaml
+  when: ocp_cluster_id_tag is not defined
+
+- name: "Setup OpenStack Load Balancer"
+  hosts: "localhost"
+  gather_facts: true
+
+  tasks:
+
+  - name: "Fetch FIP information"
+    include_tasks: tasks/rhosp-fetch-fip-info.yaml
+
+  # - name: "Create public Load Balancer"
+  #   openstack.cloud.loadbalancer:
+  #     name: "{{ rhosp_loadbalancer_prefix }}-public"
+  #     vip_network: "{{ rhosp_network }}"
+  #     floating_ip_address: "{{ openstack_fip_api_address }}"
+  #     delete_floating_ip: true
+  #     state: present
+
+  # - name: "Create private Load Balancer"
+  #   openstack.cloud.loadbalancer:
+  #     name: "{{ rhosp_loadbalancer_prefix }}-internal"
+  #     vip_network: "{{ rhosp_network }}"
+  #     state: present
+  #   register: rhosp_lb_private_res
+
+  - name: "Create public load-balancer pools"
+    openstack.cloud.lb_pool:
+      name: "{{ item.name }}"
+      lb_algorithm: "ROUND_ROBIN"
+      loadbalancer: "{{ rhosp_loadbalancer_prefix }}-public"
+      protocol: "{{ item.protocol }}"
+      state: present
+    loop: "{{ rhosp_lb_public_ports }}"
+    failed_when: false # there is no way of knowing if the pool already exists and it fails when creating again
+
+  - name: "Create private load-balancer pools"
+    openstack.cloud.lb_pool:
+      name: "{{ item.name }}"
+      lb_algorithm: "ROUND_ROBIN"
+      loadbalancer: "{{ rhosp_loadbalancer_prefix }}-internal"
+      protocol: "{{ item.protocol }}"
+      state: present
+    loop: "{{ rhosp_lb_private_ports }}"
+    failed_when: false # there is no way of knowing if the pool already exists and it fails when creating again
+
+  - name: "Create public load-balancer listeners"
+    openstack.cloud.lb_listener:
+      name: "{{ item.name }}"
+      load_balancer: "{{ rhosp_loadbalancer_prefix }}-public"
+      protocol: "{{ item.protocol }}"
+      protocol_port: "{{ item.port }}"
+      state: present
+    loop: "{{ rhosp_lb_public_ports }}"
+
+  - name: "Create private load-balancer listener"
+    openstack.cloud.lb_listener:
+      name: "{{ item.name }}"
+      load_balancer: "{{ rhosp_loadbalancer_prefix }}-internal"
+      protocol: "{{ item.protocol }}"
+      protocol_port: "{{ item.port }}"
+      state: present
+    loop: "{{ rhosp_lb_private_ports }}"
+
+
+  # LoadBalancer Health Monitor
+  - name: "Add Health Monitors to public Load Balancer pools"
+    openstack.cloud.lb_health_monitor:
+      delay: 5
+      # expected_codes: '200'
+      health_monitor_timeout: 4
+      # http_method: GET
+      is_admin_state_up: true
+      max_retries: 4
+      max_retries_down: 3
+      name: "{{ item.name }}"
+      pool: "{{ item.name }}"
+      state: present
+      type: "TCP"
+      # url_path: '/status'
+    loop: "{{ rhosp_lb_public_ports }}"
+
+  - name: "Add Health Monitor to privae Load Balancer pool"
+    openstack.cloud.lb_health_monitor:
+      delay: 5
+      # expected_codes: '200'
+      health_monitor_timeout: 4
+      # http_method: GET
+      is_admin_state_up: true
+      max_retries: 4
+      max_retries_down: 3
+      name: "{{ item.name }}"
+      pool: "{{ item.name }}"
+      state: present
+      type: "TCP"
+      # url_path: '/status'
+    loop: "{{ rhosp_lb_private_ports }}"
+
+  # Members
+  - name: "Fetch Bootstrap server info"
+    openstack.cloud.server_info:
+      name: "{{ rhosp_bootstrap_server_name }}"
+    register: rhosp_bootstrap_server_info
+
+  - name: "Fetch Control Plane server info"
+    openstack.cloud.server_info:
+      name: "{{ rhosp_control_plane_server_prefix }}-{{ item }}"
+    register: rhosp_controlplane_server_info
+    loop: "{{ range(1,4) }}"
+
+  # - name: "Print Control Plane server info"
+  #   ansible.builtin.debug:
+  #     msg:
+  #     # - "aaa: {{ [1-3] | flatten(1) }}"
+  #     - "rhosp_bootstrap_server_info: {{ rhosp_bootstrap_server_info }}"
+  #     - "rhosp_controlplane_server_info: {{ rhosp_controlplane_server_info.results }}"
+  #     - "rhosp_controlplane_server_info: {{ rhosp_controlplane_server_info.results[0] }}"
+  #     - "rhosp_controlplane_server_info: {{ rhosp_controlplane_server_info.results | length}}"
+  #     - "rhosp_controlplane_server_info: {{ rhosp_controlplane_server_info.results[0].servers[0].name }}"
+  #     - "rhosp_controlplane_server_info: {{ rhosp_controlplane_server_info.results[1].servers[0].name }}"
+  #     - "rhosp_controlplane_server_info: {{ rhosp_controlplane_server_info.results[2].servers[0].name }}"
+
+  # servers[0][''addresses''][''openshift''][?(@[''version'']==''4'')].addr
+  # - name: "Print Control Plane server info"
+  #   ansible.builtin.debug:
+  #     msg:
+  #     - "#### NAME: {{ item.servers[0].name }} ####"
+  #     - "1: {{ item | to_json | from_json | community.general.json_query('servers[0].addresses.openshift') }}"
+  #     - "ipv4_fixed_address ({{ item.servers[0].name }}): {{ item | community.general.json_query(ipv4_fixed_address) }}"
+  #     # - "CP2: {{ rhosp_controlplane_server_info.results[1] }}"
+  #     - "CP2: {{ rhosp_controlplane_server_info.results[1].servers[0].addresses[rhosp_network] }}"
+  #     - "CP2: {{ rhosp_controlplane_server_info.results[1] | community.general.json_query(ipv4_fixed_address) }}"
+  #   # vars:
+  #   #   - server_name_query: "servers[?contains(name,'server1')].port"
+  #   # loop: "{{ rhosp_controlplane_server_info.results | flatten(1) }}"
+  #   loop: "{{ rhosp_controlplane_server_info.results }}"
+  #   vars:
+  #     ipv4_fixed_address: "servers[0].addresses.{{ rhosp_network }}[?\"OS-EXT-IPS:type\" == 'fixed'].addr"
+
+  - name: "Collect ControlPlane host private IPV4"
+    ansible.builtin.set_fact:
+      # openstack_vm_ipv4_address: "{{ item.servers[0].addresses[rhosp_network] | community.general.json_query(ipv4_fixed_address) }}"
+      rhosp_instance_cp_array: "{{ (rhosp_instance_cp_array | default([])) + [item.servers[0].addresses[rhosp_network] | community.general.json_query(ipv4_fixed_address) | combine ({ 'name' : item.servers[0].name })] }}"
+    vars:
+      ipv4_fixed_address: "[?\"OS-EXT-IPS:type\" == 'fixed' && version == `4`]"
+    loop: "{{ rhosp_controlplane_server_info.results }}"
+
+  - name: "Collect Boostrap host private IPV4 "
+    ansible.builtin.set_fact:
+      rhosp_instance_bootstrap_array: "{{ [rhosp_bootstrap_server_info.servers[0].addresses[rhosp_network] | community.general.json_query(ipv4_fixed_address) | combine ({ 'name' : rhosp_bootstrap_server_info.servers[0].name })] }}"
+    vars:
+      ipv4_fixed_address: "[?\"OS-EXT-IPS:type\" == 'fixed' && version == `4`]"
+
+  - name: "Print Control Plane server info"
+    ansible.builtin.debug:
+      msg: 
+      # - "openstack_vm_ipv4_address: {{ openstack_vm_ipv4_address }}"
+      - "rhosp_instance_cp_array: {{ rhosp_instance_cp_array }}"
+      - "rhosp_instance_bootstrap_array: {{ rhosp_instance_bootstrap_array }}"
+
+  # - name: "Print Control Plane server info"
+  #   ansible.builtin.debug:
+  #     msg:
+  #     - "rhosp_bootstrap_server_info: {{ rhosp_bootstrap_server_info }}"
+  #     - "rhosp_controlplane_server_info: {{ rhosp_controlplane_server_info.results }}"
+  #     - "1: {{ rhosp_controlplane_server_info.results[0] | community.general.json_query('servers[*]') }}"
+
+  - name: "Add members to public load-balancer pools"
+    include_tasks: tasks/rhosp-loadbalancer-member.yaml
+    vars:
+      rhosp_lb_member_address: "{{ rhosp_public_lb_pool_members_item.addr }}"
+      rhosp_lb_member_name: "{{ rhosp_public_lb_pool_members_item.name }}"
+      rhosp_lb_member_pool: "{{ rhosp_loadbalancer_pool_name }}-public"
+      rhosp_lb_member_ports: "{{ rhosp_lb_public_ports }}"
+    loop: "{{ rhosp_instance_cp_array + rhosp_instance_bootstrap_array }}"
+    loop_control:
+      loop_var: rhosp_public_lb_pool_members_item
+
+  - name: "Add members to private load-balancer pool"
+    include_tasks: tasks/rhosp-loadbalancer-member.yaml
+    vars:
+      rhosp_lb_member_address: "{{ rhosp_private_lb_pool_members_item.addr }}"
+      rhosp_lb_member_name: "{{ rhosp_private_lb_pool_members_item.name }}"
+      rhosp_lb_member_pool: "{{ rhosp_loadbalancer_pool_name }}-internal"
+      rhosp_lb_member_ports: "{{ rhosp_lb_private_ports }}"
+    loop: "{{ rhosp_instance_cp_array + rhosp_instance_bootstrap_array }}"
+    loop_control:
+      loop_var: rhosp_private_lb_pool_members_item
+
+  - name: "WARNING: Manually add pool to listeners"
+    ansible.builtin.debug:
+      msg:
+      - "Pools aren't associated automatically with the Listener"
+      - "There seems to be no way to automate adding them."
+      - "No options neither on Ansible nor on openstack-cli"
+      - "Must add them manually."
+
+...

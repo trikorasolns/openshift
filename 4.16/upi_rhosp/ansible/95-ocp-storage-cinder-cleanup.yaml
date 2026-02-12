@@ -1,0 +1,22 @@
+---
+- name: "Collect information"
+  import_playbook: _common_rhosp.yaml
+  when: ocp_cluster_id_tag is not defined
+
+- name: "Delete RHOSP Cinder as storage Backend"
+  hosts: "localhost"
+  gather_facts: true
+
+  tasks:
+  - name: "Apply Manifests"
+    ansible.builtin.command: |
+      oc delete -f ocp/4.15/upi_rhosp/ansible/files/kubernetes-cloud-provider-openstack-cinder-sc.yaml
+      oc delete -f https://github.com/kubernetes/cloud-provider-openstack/raw/refs/heads/master/manifests/cinder-csi-plugin/csi-cinder-driver.yaml
+      oc delete -f https://github.com/kubernetes/cloud-provider-openstack/raw/refs/heads/master/manifests/cinder-csi-plugin/cinder-csi-nodeplugin.yaml
+      oc delete -f https://github.com/kubernetes/cloud-provider-openstack/raw/refs/heads/master/manifests/cinder-csi-plugin/cinder-csi-nodeplugin-rbac.yaml
+      oc delete -f https://github.com/kubernetes/cloud-provider-openstack/raw/refs/heads/master/manifests/cinder-csi-plugin/cinder-csi-controllerplugin.yaml
+      oc delete -f https://github.com/kubernetes/cloud-provider-openstack/raw/refs/heads/master/manifests/cinder-csi-plugin/cinder-csi-controllerplugin-rbac.yaml
+      oc -n kube-system delete secret cloud-config
+    register: ocp_cinder_secret
+
+...

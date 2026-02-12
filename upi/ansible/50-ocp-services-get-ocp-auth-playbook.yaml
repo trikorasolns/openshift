@@ -1,0 +1,42 @@
+---
+- name: "Collect information"
+  import_playbook: _common_ocp.yaml
+  when: ocp_cluster_id_tag is not defined
+
+- name: "Fetch kubeadmin account from installation"
+  hosts: "{{ bastion_host | default('localhost')}}"
+  gather_facts: true
+
+  pre_tasks:
+  - name: "Define variables"
+    ansible.builtin.include_tasks:
+      file: tasks/set_ocp_install_dir.yaml
+      
+  tasks:
+  - name: "Read Openshift Install State"
+    ansible.builtin.slurp:
+      src: "{{ openshift_cluster_install_dir }}/.openshift_install_state.json"
+    register: ocp_cluster_install_state_slurp
+
+  - name: "Debug"
+    ansible.builtin.debug:
+      msg:
+        - "ocp_cluster_install_state_slurp: {{ ocp_cluster_install_state_slurp }}"
+      verbosity: 2
+
+  - name: "Transform metadata"
+    ansible.builtin.set_fact:
+      openshift_install_state: "{{ ocp_cluster_install_state_slurp.content | b64decode | from_json }}"
+
+  - name: "Print cluster details"
+    ansible.builtin.debug:
+      msg: 
+      - "ocp_cluster_id: {{ openshift_install_state['*installconfig.ClusterID'].InfraID }}"
+      - "Kubeadmin password: {{ openshift_install_state['*password.KubeadminPassword'].Password }}"
+
+  - name: "Fetch the cluster config to the .kube folder on the controllers user home"
+    ansible.builtin.fetch:
+      src: "{{ openshift_cluster_install_dir }}/auth/kubeconfig"
+      dest: "{{ lookup('env','HOME') }}/.kube/ocp-{{ hostvars['localhost']['ocp_infra_id'] }}-config"
+      flat: yes
+...

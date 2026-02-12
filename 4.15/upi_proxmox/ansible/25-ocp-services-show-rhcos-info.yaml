@@ -1,0 +1,55 @@
+---
+- name: "Show info required to install RHCOS by using it's ISO image"
+  hosts: "ocp_services"
+  gather_facts: true
+
+  pre_tasks:
+  - name: "Define variables"
+    ansible.builtin.include_tasks:
+      file: tasks/set_ocp_install_dir.yaml
+      
+  tasks:
+  - name: "Obtain the correct version of your RHCOS images"
+    ansible.builtin.shell: |
+        ./openshift-install coreos print-stream-json
+    register: coreos_stream_res
+    args:
+      chdir: "{{ openshift_install_dir }}"
+
+  - name: "RHCOS output"
+    ansible.builtin.debug:
+      var: coreos_stream_res.stdout
+      verbosity: 2
+
+  - name: "Set fact for coreos information"
+    ansible.builtin.set_fact:
+      coreos_stream_json: "{{ coreos_stream_res.stdout | from_json  }}"
+
+  - name: "RHCOS image to use"
+    ansible.builtin.debug:
+      msg: 
+      # - "coreos_stream_json: {{ coreos_stream_json  }}"
+      # - "coreos_stream_json.architectures: {{ coreos_stream_json.architectures }}"
+      # - "coreos_stream_json.architectures.x86_64: {{ coreos_stream_json.architectures.x86_64 }}"
+      # - "coreos_stream_json.architectures.x86_64.artifacts.metal: {{ coreos_stream_json.architectures.x86_64.artifacts.metal }}"
+      # - "coreos_stream_json.architectures.x86_64.artifacts.metal.formats: {{ coreos_stream_json.architectures.x86_64.artifacts.metal.formats }}"
+      - "CoreOS ISO disk location: {{ coreos_stream_json.architectures.x86_64.artifacts.metal.formats.iso.disk.location }}"
+
+  - name: "coreos-installer command for any host"
+    ansible.builtin.debug:
+      msg: "sudo mount /dev/sr0 /mnt ; /mnt/ignition/coreos_i.sh"
+
+  - name: "coreos-installer command for bootstrap"
+    ansible.builtin.debug:
+      msg: "sudo coreos-installer install /dev/sda --ignition-url http://{{ hostvars['ocp4-services'].ansible_host }}:8080/ocp4/bootstrap.ign --insecure-ignition"
+
+  - name: "coreos-installer command for Control Plane (master) nodes"
+    ansible.builtin.debug:
+      msg: "sudo coreos-installer install /dev/sda --ignition-url http://{{ hostvars['ocp4-services'].ansible_host }}:8080/ocp4/master.ign --insecure-ignition"
+
+  - name: "coreos-installer command for Compute (worker) nodes"
+    ansible.builtin.debug:
+      msg: "sudo coreos-installer install /dev/sda --ignition-url http://{{ hostvars['ocp4-services'].ansible_host }}:8080/ocp4/worker.ign --insecure-ignition"
+    when: use_compute_nodes
+
+...

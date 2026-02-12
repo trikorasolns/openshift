@@ -1,0 +1,30 @@
+---
+- name: "Collect information"
+  import_playbook: _common_rhosp.yaml
+
+- name: "Check required variables"
+  hosts: "localhost"
+  gather_facts: true
+
+  tasks:
+
+  - name: "Delete Load Balancer"
+    openstack.cloud.loadbalancer:
+      name: "{{ rhosp_loadbalancer_prefix }}"
+      state: absent
+
+  - name: "Delete floating IPs"
+    openstack.cloud.floating_ip:
+      description: "{{ item }}"
+      state: absent
+    loop:
+    - "{{ rhosp_fip_api_name }}"
+    - "{{ rhosp_fip_ingress_name }}"
+    - "{{ rhosp_fip_bootstrap_name }}"
+
+  - name: "Delete RHCOS image"
+    openstack.cloud.image:
+      image: "rhcos-{{ ocp_infra_id }}"
+      state: absent
+
+...

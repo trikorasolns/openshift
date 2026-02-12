@@ -1,0 +1,25 @@
+---
+- name: "Create VM"
+  ansible.builtin.shell: |
+    qm create {{ hostvars[vm_name].pve.vmid }} {% if hostvars[vm_name].description is defined %}--description "{{ hostvars[vm_name].description }}"{% endif %} --name "{{ hostvars[vm_name].vm_name }}" --tags 'ocp4;ocp-cp'
+  failed_when: false
+
+- name: "Configure VM"
+  ansible.builtin.shell: |
+    {{ vm_name }}
+  loop:
+  - qm set {{ hostvars[vm_name].pve.vmid }} --sockets 1 --cores {{ hostvars[vm_name].hw.vcpu }} --cpu 'x86-64-v3'
+  - qm set {{ hostvars[vm_name].pve.vmid }} --memory {{ hostvars[vm_name].hw.ram }}
+  - qm set {{ hostvars[vm_name].pve.vmid }} --ostype l26
+  - qm set {{ hostvars[vm_name].pve.vmid }} --cdrom none
+  - qm set {{ hostvars[vm_name].pve.vmid }} --net0 virtio,firewall=1,bridge=vmbr0,{% if hostvars[vm_name].my_mac is defined %}macaddr={{ hostvars[vm_name].my_mac }}{% endif %}
+
+- name: "Create Hard Drive"
+  ansible.builtin.shell: |
+    {{ vm_name }}
+  loop:
+  - qm set {{ hostvars[vm_name].pve.vmid }} --scsihw virtio-scsi-single
+  - qm set {{ hostvars[vm_name].pve.vmid }} --scsi0 local-lvm:{{ hostvars[vm_name].hw.storage }}
+
+
+...

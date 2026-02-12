@@ -1,0 +1,16 @@
+---
+- name: "Init the OCP Services host for Ansible"
+  hosts: "ocp_services"
+  gather_facts: false
+
+  tasks:
+    - name: "Install python"
+      ansible.builtin.package:
+        name: "{{ item }}"
+        state: present
+      loop:
+      - python
+      - python3-libdnf5
+      become: true
+
+...

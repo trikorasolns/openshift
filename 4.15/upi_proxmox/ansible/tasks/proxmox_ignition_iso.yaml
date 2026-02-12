@@ -1,0 +1,45 @@
+---
+- name: "Set facts"
+  ansible.builtin.set_fact:
+    vm_ignition_iso_dir: "{{ role.name }}/iso/ignition"
+    services_host: "{{ hostvars['ocp4-services'].ansible_host }}"
+
+# - name: "Read Ignition file signature"
+#   ansible.builtin.slurp:
+#     src: "{{ openshift_cluster_install_dir }}/{{ hostvars[vm_name].ocp_role }}.ign.sig"
+#   register: ocp_ignition_sig_slurp
+#   # ansible.builtin.set_fact: 
+#   #   ocp_install_state: "{{ lookup('ansible.builtin.file', ansible_env.HOME + '/' + ocp_install_root_dir + '/' + ocp_cluster_name + '/.openshift_install_state.json') | to_json }}"
+
+# - name: "Debug Slurp" 
+#   ansible.builtin.debug:
+#     msg:
+#       - "ocp_ignition_sig_slurp: {{ ocp_ignition_sig_slurp }}"
+#     verbosity: 2
+
+# - name: "Transform Slurp"
+#   ansible.builtin.set_fact:
+#     ignition_hash: "{{ ocp_ignition_sig_slurp.content | b64decode }}"
+
+- name: "Create VM ISO"
+  ansible.builtin.shell: |
+    mkdir -p {{ vm_ignition_iso_dir }}
+
+- name: "Template Ignition file"
+  ansible.builtin.template:
+    src: "../templates/ignition-config.tpl.j2"
+    dest: "{{ vm_ignition_iso_dir }}/config.ign"
+
+- name: "Template RHCOS install bash scriptfile"
+  ansible.builtin.template:
+    src: "../templates/coreos-install.sh.j2"
+    dest: "{{ vm_ignition_iso_dir }}/coreos-install.sh"
+
+- name: "Create the Ignition ISO"
+  ansible.builtin.shell: |
+    mkisofs -o ignition-{{ role.name }}.iso -V ignition {{ role.name }}/iso
+
+- name: Copy ISO files to the ISO directory"
+  ansible.builtin.shell: |
+    cp ignition-*.iso /var/lib/vz/template/iso/
+...

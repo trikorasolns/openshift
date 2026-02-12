@@ -1,0 +1,54 @@
+---
+- name: "Read installation info from openshift installation"
+  hosts: "ocp_installer"
+  gather_facts: true
+
+  pre_tasks:
+  - name: "Check required variables"
+    ansible.builtin.assert:
+      that:
+        - ocp_cluster_name is defined and (ocp_cluster_name | length > 0)
+      fail_msg:
+        - "The name of the OCP cluster must be defined in the 'ocp_cluster_name' variable."
+
+  - name: "Define variables"
+    ansible.builtin.include_tasks:
+      file: tasks/set_ocp_install_dir.yaml
+
+  tasks:
+    - name: "Read metadata file"
+      ansible.builtin.slurp:
+        src: "{{ openshift_cluster_install_dir }}/metadata.json"
+      register: metadata_json_slurp
+
+    - name: "Parse metadata information"
+      ansible.builtin.set_fact:
+        metadata_json: "{{ metadata_json_slurp.content | b64decode }}"
+
+  post_tasks:
+
+    - name: "Set CoreOS Image Location under localhost"
+      ansible.builtin.set_fact:
+        global_metadata_json: "{{ metadata_json }}"
+      delegate_to: localhost
+      delegate_facts: True
+
+- name: "Setup Environment"
+  hosts: "localhost"
+  gather_facts: false
+
+  pre_tasks:
+  - name: "Fetch Global variables"
+    ansible.builtin.set_fact:
+      metadata_json: "{{ hostvars['localhost']['global_metadata_json'] }}"
+    delegate_to: localhost
+  
+  tasks:
+  - name: "Set metadata infra ID"
+    ansible.builtin.set_fact:
+      ocp_infra_id: "{{ metadata_json.infraID }}"
+
+  - name: "Set requierd facts"
+    ansible.builtin.set_fact:
+      ocp_cluster_id_tag: "openshiftClusterID={{ ocp_infra_id }}"
+...

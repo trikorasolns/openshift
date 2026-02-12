@@ -1,0 +1,70 @@
+---
+- name: "Generate OCP Cluster installation"
+  hosts: "{{ bootstrap_host | default('localhost')}}"
+  gather_facts: true
+
+  pre_tasks:
+  - name: "Validate required variables"
+    ansible.builtin.assert:
+      that:
+      - "ocp_install_root_dir is defined and ocp_install_root_dir | length > 0"
+
+  - name: "Set variables"
+    ansible.builtin.set_fact:
+      openshift_client_root_url: "https://mirror.openshift.com/pub/openshift-v4/{{ ocp_release_arch }}/clients/ocp/{{ ocp_version }}"
+
+  - name: "Define variables"
+    ansible.builtin.include_tasks:
+      file: tasks/set_ocp_install_dir.yaml
+
+  tasks:
+  - name: "Create openshift install root directory"
+    ansible.builtin.file:
+      path: "{{ openshift_install_dir }}"
+      state: directory
+      mode: '0755'
+
+  - name: "Get release information"
+    ansible.builtin.get_url:
+      url: "{{ openshift_client_root_url }}/release.txt"
+      dest: "{{ openshift_install_dir }}/"
+      # mode: '0440'
+
+  - name: "Get release image name"
+    ansible.builtin.shell: |
+      grep 'Pull From: quay.io' release.txt | awk -F ' ' '{print $3}'
+    args:
+      chdir: "{{ openshift_install_dir }}"
+    register: image_name_res
+
+  - name: "Print image name"
+    ansible.builtin.debug:
+      msg:
+        - "image_name_res: {{ image_name_res.stdout }}"
+
+  - name: "Download the ocp installer and client"
+    ansible.builtin.get_url:
+      url: "{{ openshift_client_root_url }}/{{ item }}"
+      dest: "{{ openshift_install_dir }}/{{ item }}"
+    loop:
+      - openshift-install-linux.tar.gz
+      - openshift-client-linux.tar.gz
+    when: skip_download is undefined or not (skip_download | bool)
+
+  - name: "Extract the ocp installer and client"
+    ansible.builtin.unarchive:
+      src: "{{ openshift_install_dir }}/{{ item }}"
+      dest: "{{ openshift_install_dir }}"
+      remote_src: true
+    loop:
+      - openshift-install-linux.tar.gz
+      - openshift-client-linux.tar.gz
+    when: skip_download is undefined or not (skip_download | bool)
+
+  - name: "Print image name"
+    ansible.builtin.debug:
+      msg:
+        - "Installation folder: {{ openshift_install_dir }}/"
+        - "image_name_res: {{ image_name_res.stdout }}"
+
+...

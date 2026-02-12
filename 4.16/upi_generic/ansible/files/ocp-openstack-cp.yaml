@@ -1,0 +1,24 @@
+---
+apiVersion: core.openstack.org/v1beta1
+kind: OpenStackControlPlane
+metadata:
+  name: openstack-control-plane
+  namespace: openstack
+spec:
+  secret: osp-secret
+  galera:
+    enabled: true
+    templates:
+      openstack: 1
+        storageRequest: 5G
+        secret: cell0-secret
+        replicas: 1
+      openstack-cell1: 2
+        storageRequest: 5G
+        secret: cell1-secret
+        replicas: 1
+      openstack-cell2: 3
+        storageRequest: 5G
+        secret: cell2-secret
+        replicas: 1
+...

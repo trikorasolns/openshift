@@ -1,0 +1,43 @@
+---
+# - name: "Collect information"
+#   import_playbook: _common_rhosp.yaml
+#   when: ocp_cluster_id_tag is not defined
+
+- name: "Delete RHOSP Cinder as storage Backend"
+  hosts: "localhost"
+  gather_facts: true
+  vars:
+    manila_resource_templates:
+    - kubernetes-cloud-provider-openstack-manila-secret
+    - kubernetes-cloud-provider-openstack-manila-cm
+    k8s_maj_min_version: "{{ (k8s_version | split('.'))[0] }}.{{ (k8s_version | split('.'))[1] }}"
+
+  tasks:
+  - name: "Apply Manifests"
+    ansible.builtin.shell: |
+      oc delete -f https://raw.githubusercontent.com/kubernetes/cloud-provider-openstack/refs/heads/release-{{ k8s_maj_min_version }}/manifests/manila-csi-plugin/csidriver.yaml
+      oc delete -f https://raw.githubusercontent.com/kubernetes/cloud-provider-openstack/refs/heads/release-{{ k8s_maj_min_version }}/manifests/manila-csi-plugin/csi-nodeplugin-rbac.yaml
+      oc delete -f https://raw.githubusercontent.com/kubernetes/cloud-provider-openstack/refs/heads/release-{{ k8s_maj_min_version }}/manifests/manila-csi-plugin/csi-controllerplugin-rbac.yaml
+      oc delete -f https://raw.githubusercontent.com/kubernetes/cloud-provider-openstack/refs/heads/release-{{ k8s_maj_min_version }}/examples/manila-csi-plugin/nfs/dynamic-provisioning/storageclass.yaml
+
+  - name: "Template manifests"
+    ansible.builtin.template:
+      src: "{{ item }}.yaml.j2"
+      dest: "/tmp/{{ item }}.yaml"
+      mode: 0600
+    vars:
+      rhosp_os_password: whocares
+    loop: "{{ manila_resource_templates }}"
+
+  - name: "Create Manila resources"
+    ansible.builtin.command: |
+      oc delete -f /tmp/{{ item }}.yaml
+    register: ocp_manila_resource_res
+    loop: "{{ manila_resource_templates }}"
+
+  - name: "Create Manila Config Map"
+    ansible.builtin.command: |
+      oc delete -f /tmp/kubernetes-cloud-provider-openstack-manila-secret.yaml
+    register: ocp_cinder_secret
+
+...

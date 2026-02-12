@@ -1,0 +1,16 @@
+---
+- name: "Start VM"
+  ansible.builtin.shell: |
+    qm start {{ hostvars[vm_name].pve.vmid }}
+  when: state == 'Started'
+
+- name: "Shutdown VM"
+  ansible.builtin.shell: |
+    qm shutdown {{ hostvars[vm_name].pve.vmid }}
+  when: state == 'Shutdown'
+
+- name: "Stop VM"
+  ansible.builtin.shell: |
+    qm shutdown {{ hostvars[vm_name].pve.vmid }}
+  when: state == 'Stopped'
+...

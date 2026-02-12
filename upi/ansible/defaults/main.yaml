@@ -1,0 +1,8 @@
+ocp_install_root_dir: "openshift"
+ocp_install_root_dir_under_user_home: true
+ocp_release_arch: amd64
+ocp_apiint_port: 22623
+
+# rhsop_subnet_range: '10.0.0.0/16'
+
+use_compute_nodes: false

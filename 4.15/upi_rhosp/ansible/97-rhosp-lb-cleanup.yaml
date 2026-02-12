@@ -1,0 +1,113 @@
+---
+- name: "Collect information"
+  import_playbook: _common_rhosp.yaml
+  when: ocp_cluster_id_tag is not defined
+
+- name: "Cleanup network infrastructure"
+  hosts: "localhost"
+  gather_facts: true
+
+  tasks:
+  - name: "Delete members from public load-balancer pools"
+    include_tasks: tasks/rhosp-loadbalancer-member.yaml
+    vars:
+      rhosp_lb_member_state: absent
+      rhosp_lb_member_address: "{{ rhosp_public_lb_pool_members_item.addr }}"
+      rhosp_lb_member_name: "{{ rhosp_public_lb_pool_members_item.name }}"
+      rhosp_lb_member_pool: "{{ rhosp_loadbalancer_pool_name }}-public"
+      rhosp_lb_member_ports: "{{ rhosp_lb_public_ports }}"
+    loop: "{{ rhosp_instance_cp_array + rhosp_instance_bootstrap_array }}"
+    loop_control:
+      loop_var: rhosp_public_lb_pool_members_item
+
+  - name: "Delete members from private load-balancer pool"
+    include_tasks: tasks/rhosp-loadbalancer-member.yaml
+    vars:
+      state: absent
+      rhosp_lb_member_address: "{{ rhosp_private_lb_pool_members_item.addr }}"
+      rhosp_lb_member_name: "{{ rhosp_private_lb_pool_members_item.name }}"
+      rhosp_lb_member_pool: "{{ rhosp_loadbalancer_pool_name }}-internal"
+      rhosp_lb_member_ports: "{{ rhosp_lb_private_ports }}"
+    loop: "{{ rhosp_instance_cp_array + rhosp_instance_bootstrap_array }}"
+    loop_control:
+      loop_var: rhosp_private_lb_pool_members_item
+
+  - name: "Delete Health Monitors from public Load Balancer pools"
+    openstack.cloud.lb_health_monitor:
+      # delay: 5
+      # # expected_codes: '200'
+      # health_monitor_timeout: 4
+      # # http_method: GET
+      # is_admin_state_up: true
+      # max_retries: 4
+      # max_retries_down: 3
+      name: "{{ item.name }}"
+      pool: "{{ item.name }}"
+      state: absent
+      # type: "TCP"
+      # url_path: '/status'
+    loop: "{{ rhosp_lb_public_ports }}"
+
+  - name: "Delete Health Monitor from privae Load Balancer pool"
+    openstack.cloud.lb_health_monitor:
+      # delay: 5
+      # # expected_codes: '200'
+      # health_monitor_timeout: 4
+      # # http_method: GET
+      # is_admin_state_up: true
+      # max_retries: 4
+      # max_retries_down: 3
+      name: "{{ item.name }}"
+      pool: "{{ item.name }}"
+      state: absent
+      # type: "TCP"
+      # url_path: '/status'
+    loop: "{{ rhosp_lb_private_ports }}"
+
+  - name: "Delete public load-balancer listeners"
+    openstack.cloud.lb_listener:
+      name: "{{ item.name }}"
+      load_balancer: "{{ rhosp_loadbalancer_prefix }}-public"
+      # protocol: "{{ item.protocol }}"
+      # protocol_port: "{{ item.port }}"
+      state: absent
+    loop: "{{ rhosp_lb_public_ports }}"
+
+  - name: "Delete private load-balancer listener"
+    openstack.cloud.lb_listener:
+      name: "{{ item.name }}"
+      load_balancer: "{{ rhosp_loadbalancer_prefix }}-internal"
+      # protocol: "{{ item.protocol }}"
+      # protocol_port: "{{ item.port }}"
+      state: absent
+    loop: "{{ rhosp_lb_private_ports }}"
+
+  - name: "Delete public load-balancer pools"
+    openstack.cloud.lb_pool:
+      name: "{{ item.name }}"
+      # lb_algorithm: "ROUND_ROBIN"
+      loadbalancer: "{{ rhosp_loadbalancer_prefix }}-public"
+      # protocol: "{{ item.protocol }}"
+      state: absent
+    loop: "{{ rhosp_lb_public_ports }}"
+
+  - name: "Delete private load-balancer pool"
+    openstack.cloud.lb_pool:
+      name: "{{ item.name }}"
+      # lb_algorithm: "ROUND_ROBIN"
+      loadbalancer: "{{ rhosp_loadbalancer_prefix }}-internal"
+      # protocol: "{{ item.protocol }}"
+      state: absent
+    loop: "{{ rhosp_lb_private_ports }}"
+
+  # - name: "Delete public Load Balancer"
+  #   openstack.cloud.loadbalancer:
+  #     name: "{{ rhosp_loadbalancer_prefix }}-public"
+  #     delete_floating_ip: false
+  #     state: absent
+
+  # - name: "Delete private Load Balancer"
+  #   openstack.cloud.loadbalancer:
+  #     name: "{{ rhosp_loadbalancer_prefix }}-internal"
+  #     state: absent
+...

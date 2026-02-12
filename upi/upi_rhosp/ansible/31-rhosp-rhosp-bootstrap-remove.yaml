@@ -1,0 +1,59 @@
+---
+- name: "Collect information"
+  import_playbook: _common_rhosp.yaml
+  when: ocp_cluster_id_tag is not defined
+
+- name: "Deploy bastion and remove bootstrap server"
+  hosts: "localhost"
+  gather_facts: true
+
+  tasks:
+  - name: "Fetch FIP information"
+    include_tasks: tasks/rhosp-fetch-fip-info.yaml
+
+  - name: "Fetch Bootstrap server info"
+    openstack.cloud.server_info:
+      name: "{{ rhosp_bootstrap_server_name }}"
+    register: rhosp_bootstrap_server_info
+
+  - name: 'Create the Bastion server'
+    openstack.cloud.server:
+      name: "{{ rhosp_bastion_server_name }}"
+      image: "{{ rhosp_rhcoreos_image_name }}"
+      flavor: "{{ rhosp_flavor_bastion }}"
+      userdata: "{{ lookup('file', '/tmp/bootstrap-' + metadata_json.infraID + '-shim.ign') | string }}"
+      network: "{{ rhosp_network }}"
+      floating_ips: "{{ openstack_fip_bootstrap_address | default(omit) }}"
+      auto_ip: "{{ bootstrap_auto_ip | default(omit) }}"
+      meta: "{{ ocp_cluster_id_tag }}"
+    register: rhosp_server_bastion_deploy_res
+
+  - name: "Remove Bootstrap from Public LB Pool members"
+    include_tasks: tasks/rhosp-loadbalancer-member.yaml
+    vars:
+      rhosp_lb_member_address: "{{ rhosp_public_lb_pool_members_item.addr }}"
+      rhosp_lb_member_name: "{{ rhosp_public_lb_pool_members_item.name }}"
+      rhosp_lb_member_pool: "{{ rhosp_loadbalancer_pool_name }}-public"
+      rhosp_lb_member_ports: "{{ rhosp_lb_public_ports }}"
+      rhosp_lb_member_state: "absent"
+    loop: "{{ rhosp_instance_bootstrap_array }}"
+    loop_control:
+      loop_var: rhosp_public_lb_pool_members_item
+
+  - name: "Remove Bootstrap from Internal LB Pool members"
+    include_tasks: tasks/rhosp-loadbalancer-member.yaml
+    vars:
+      rhosp_lb_member_address: "{{ rhosp_private_lb_pool_members_item.addr }}"
+      rhosp_lb_member_name: "{{ rhosp_private_lb_pool_members_item.name }}"
+      rhosp_lb_member_pool: "{{ rhosp_loadbalancer_pool_name }}-internal"
+      rhosp_lb_member_ports: "{{ rhosp_lb_internal_ports }}"
+      rhosp_lb_member_state: "absent"
+    loop: "{{ rhosp_instance_bootstrap_array }}"
+    loop_control:
+      loop_var: rhosp_private_lb_pool_members_item
+
+  - name: 'Remove the bootstrap server'
+    openstack.cloud.server:
+      name: "{{ rhosp_bootstrap_server_name }}"
+      state: "absent" 
+...

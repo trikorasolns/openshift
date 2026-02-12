@@ -1,0 +1,14 @@
+{
+  "ignition": {
+    "version": "3.5.0",
+    "config": {
+      "replace": {
+        "source": "http://{{ services_host }}:8080/ocp4/{{ role.name }}.ign",
+        "verification": "{{ role.hash }}"
+      }
+    }
+  },
+  "storage": {
+    "disks": [{"device": "/dev/sda" }]
+  }
+}

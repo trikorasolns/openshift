@@ -1,0 +1,41 @@
+---
+- name: "Check required variables"
+  hosts: "localhost"
+  # gather_facts: true
+  # vars:
+  #   rhosp_network_cidr: 'unknown'
+
+  tasks:
+  - name: Gather information about a previously created subnet by name
+    openstack.cloud.subnets_info:
+      name: "{{ rhosp_network }}"
+    register: openstack_subnet_res
+
+  - name: 'Deploy the Bastion servers'
+    openstack.cloud.server:
+      name: "{{ rhosp_bastion_server_name }}"
+      image: "{{ rhosp_rhcoreos_image_name }}"
+      flavor: "{{ rhosp_flavor_bastion }}"
+      userdata: "{{ lookup('file', openshift_cluster_install_dir + '/worker-' + metadata_json.infraID + '.ign') | string }}"
+      network: "{{ rhosp_network }}"
+      # nics:
+      # - port-name: "{{ os_port_controlplane }}"
+      # meta: "{{ ocp_cluster_id_tag }}"
+      meta: 
+        openshiftClusterID: "{{ ocp_infra_id }}"
+        hostname: "{{ rhosp_flavor_bastion }}"
+      # wait: false # due to TypeError: 'NoneType' object is not subscriptable
+      security_groups:
+      - default
+
+- name: "Configure Bastion"
+  hosts: "{{ ocp_bastion | default('ocp_bastion') | default('localhost') }}"
+
+  tasks:
+  - name: "Install required packages"
+    ansible.builtin.package:
+      name: "{{ required_packages }}"
+      state: present
+    become: true
+
+...

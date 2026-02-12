@@ -1,0 +1,35 @@
+---
+- name: "Create Proxmox VMs"
+  hosts: "proxmox_nodes"
+  gather_facts: true
+
+  pre_tasks:
+  - name: "Affected groups"
+    ansible.builtin.set_fact:
+      selected_groups: ['ocp_bootstrap','ocp_control_plane']
+    when: selected_groups is undefined or selected_groups | length == 0
+
+  tasks:
+  - name: "Build VM list"
+    ansible.builtin.set_fact:
+      vm_host_list: "{{ (vm_host_list | default([]) ) + (groups[item] | default([])) }}"
+    loop: "{{ selected_groups }}"
+    when: vm_host_list is undefined
+
+  - name: "Print VMs"
+    ansible.builtin.debug:
+      var: vm_host_list
+    run_once: true
+
+  - name: "Pause until the previous change is confirmed"
+    ansible.builtin.pause:
+
+  - name: "Configure VM"
+    ansible.builtin.include_tasks:
+      file: tasks/vm_configure.yaml
+    vars:
+      vm_name: "{{ item }}"
+    loop: "{{ vm_host_list }}"
+    when: ansible_hostname == hostvars[item].pve.owner
+
+...

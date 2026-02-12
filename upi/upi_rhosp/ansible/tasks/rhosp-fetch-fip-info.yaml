@@ -1,0 +1,42 @@
+---
+- name: "Fetch API floating IP information"
+  openstack.cloud.floating_ip_info:
+    description: "{{ rhosp_fip_api_name }}"
+  register: fip_api_info
+
+- name: "Fetch Ingress floating IP information"
+  openstack.cloud.floating_ip_info:
+    description: "{{ rhosp_fip_ingress_name }}"
+  register: fip_ingress_info
+
+- name: "Fetch Bootstrap floating IP information"
+  openstack.cloud.floating_ip_info:
+    description: "{{ rhosp_fip_bootstrap_name }}"
+  register: fip_bootstrap_info
+
+- name: "Print fip_api_info"
+  ansible.builtin.debug:
+    var: fip_api_info
+
+- name: "Print fip_ingress_info"
+  ansible.builtin.debug:
+    var: fip_ingress_info
+
+- name: "Print fip_bootstrap_info"
+  ansible.builtin.debug:
+    var: fip_bootstrap_info
+
+- name: "Set the external IPs for API and APPS"
+  ansible.builtin.set_fact:
+    openstack_fip_api_address: "{{ fip_api_info.floating_ips[0].floating_ip_address }}"
+    openstack_fip_api_id: "{{ fip_api_info.floating_ips[0].id }}"
+    openstack_fip_apps_address: "{{ fip_ingress_info.floating_ips[0].floating_ip_address }}"
+    openstack_fip_bootstrap_address: "{{ fip_bootstrap_info.floating_ips[0].floating_ip_address }}"
+
+- name: "Print RHOSP Floating IP info"
+  ansible.builtin.debug:
+    msg:
+      - "openstack_fip_api_address: {{ openstack_fip_api_address }}"
+      - "openstack_fip_apiopenstack_fip_apps_address_address: {{ openstack_fip_apps_address }}"
+      - "openstack_fip_bootstrap_address: {{ openstack_fip_bootstrap_address }}"
+...

@@ -1,0 +1,46 @@
+---
+- name: "Collect information"
+  import_playbook: _common_rhosp.yaml
+
+- name: "Check required variables"
+  hosts: "localhost"
+  gather_facts: true
+
+  tasks:
+  - name: "Check required variables"
+    ansible.builtin.assert:
+      that:
+        - ocp_cluster_name is defined and (ocp_cluster_name | length > 0)
+      fail_msg:
+        - "The name of the OCP cluster must be defined in the 'ocp_cluster_name' variable."
+
+- name: "Setup OpenStack Environment"
+  hosts: "localhost"
+  gather_facts: true
+
+  pre_tasks:
+
+  - name: "RHCOS image to use"
+    ansible.builtin.debug:
+      msg: 
+      - "CoreOS ISO disk location (coreos_image_location): {{ coreos_image_location }}"
+      - "CoreOS compressed ISO disk file name: {{ coreos_image_filename }}"
+      - "CoreOS ISO disk file name: {{ coreos_image_filename | splitext | first }}"
+
+  tasks:
+
+# Bootstrap Ignition Image
+- name: "Generate Bootstrap Ignition Image"
+  import_playbook: 21.5-rhosp-prepare-bootstrap-ign-img.yaml
+
+
+# Bootstrap
+- name: "Deploy Bootrap instances"
+  import_playbook: 21.6-rhosp-bootstrap-instance.yaml
+
+- name: "Load Balancer for Bootstrap"
+  import_playbook: 21.7-rhosp-load-balancer-members-bootstrap.yaml
+
+- name: "Show required DNS records"
+  import_playbook: 20.9-rhosp-print-lb-dns-info.yaml
+...

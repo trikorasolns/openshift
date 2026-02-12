@@ -1,0 +1,32 @@
+= OCP UPI Installation and Configuration
+Antonio C. <ac (at) trikorasolutions (dot) com>
+:revdate: {docdate}
+:icons: font
+:toc: left
+:toclevels: 3
+:toc-title: Table of Contents
+:source-highlighter: highlight.js
+ifdef::env-github[]
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
+
+== Introduction
+
+[.lead]
+This repository is about deploying and configuring OCP on UPI.
+
+== Acronyms
+
+OCP:: Openshift Container Platform
+
+UPI:: User Provided Infrastructure
+
+== Current
+
+[.lead]
+Currently this project is being tested against OCP version *4.16*.
+

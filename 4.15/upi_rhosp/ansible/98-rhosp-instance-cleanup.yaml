@@ -1,0 +1,30 @@
+---
+- name: "Collect information"
+  import_playbook: _common_rhosp.yaml
+  when: ocp_cluster_id_tag is not defined
+
+- name: "Collect information"
+  import_playbook: 97-rhosp-lb-cleanup.yaml
+  
+- name: "Setup OpenStack VMs"
+  hosts: "localhost"
+  gather_facts: true
+
+  tasks:
+  - name: "Delete Bootstrap Ignition image"
+    openstack.cloud.image:
+      name: "{{ rhosp_ocp_bootstrap_ign_image_name }}"
+      state: absent
+
+  - name: 'Delete the bootstrap server'
+    openstack.cloud.server:
+      name: "{{ rhosp_bootstrap_server_name }}"
+      state: absent
+
+  - name: 'Delete the Control Plane servers'
+    openstack.cloud.server:
+      name: "{{ rhosp_control_plane_server_prefix }}-{{ item }}"
+      state: absent
+    loop: "{{ range(1 ,4) }}"
+
+...

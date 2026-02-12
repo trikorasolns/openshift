@@ -1,0 +1,41 @@
+---
+- name: "Collect information"
+  import_playbook: _common_rhosp.yaml
+  when: ocp_cluster_id_tag is not defined
+
+- name: "Deploy RHOSP Cinder as storage Backend"
+  hosts: "localhost"
+  gather_facts: true
+
+  tasks:
+  - name: "Template cloud.conf"
+    ansible.builtin.set_fact:
+      rhosp_cloud_conf: "{{ lookup('template', 'cloud.conf.j2') }}"
+  
+  - name: "Template cloud.conf Secret"
+    ansible.builtin.template:
+      src: csi-secret-cinderplugin.yaml.j2
+      dest: "/tmp/csi-secret-cinderplugin.yaml"
+      mode: 0600
+
+  - name: "Create cloud.conf secret"
+    ansible.builtin.command: |
+      oc apply -f /tmp/csi-secret-cinderplugin.yaml
+    register: ocp_cinder_secret
+
+  - name: "Delete the cloud.conf file"
+    ansible.builtin.file:
+      path: "/tmp/csi-secret-cinderplugin.yaml"
+      state: absent
+
+  - name: "Apply Manifests"
+    ansible.builtin.command: |
+      oc apply -f https://github.com/kubernetes/cloud-provider-openstack/raw/refs/heads/master/manifests/cinder-csi-plugin/cinder-csi-controllerplugin-rbac.yaml
+      oc apply -f https://github.com/kubernetes/cloud-provider-openstack/raw/refs/heads/master/manifests/cinder-csi-plugin/cinder-csi-controllerplugin.yaml
+      oc apply -f https://github.com/kubernetes/cloud-provider-openstack/raw/refs/heads/master/manifests/cinder-csi-plugin/cinder-csi-nodeplugin-rbac.yaml
+      oc apply -f https://github.com/kubernetes/cloud-provider-openstack/raw/refs/heads/master/manifests/cinder-csi-plugin/cinder-csi-nodeplugin.yaml
+      oc apply -f https://github.com/kubernetes/cloud-provider-openstack/raw/refs/heads/master/manifests/cinder-csi-plugin/csi-cinder-driver.yaml
+      oc apply -f ocp/4.15/upi_rhosp/ansible/files/kubernetes-cloud-provider-openstack-cinder-sc.yaml
+    register: ocp_cinder_secret
+
+...

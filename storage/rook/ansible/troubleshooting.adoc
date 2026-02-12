@@ -1,0 +1,398 @@
+= Troubleshooting Rook on OpenShift
+Antonio C. <ac (at) trikorasolutions (dot) com>
+:revdate: {docdate}
+:icons: font
+:toc: left
+:toclevels: 3
+:toc-title: Table of Contents
+:description: Rook on OpenShift
+
+== Rook Ceph Operator doesn't deploy any POD
+
+*Problem*
+
+Rook operator ReplicaSet doesn't deploy any POD.
+
+*Symptom*
+
+Several ReplicaSet of the Rook Ceph project are in error state. The error is the following.
+
+[source,bash]
+----
+oc -n rook-ceph describe rs rook-ceph-operator-746677996c
+----
+
+[source,]
+----
+Events:
+  Type     Reason        Age                  From                   Message
+  ----     ------        ----                 ----                   -------
+  Warning  FailedCreate  85s (x119 over 8h)   replicaset-controller  Error creating: pods "rook-ceph-operator-746677996c-" is forbidden: unable to validate against any security context constraint: [provider "anyuid": Forbidden: not usable by user or serviceaccount, provider "pipelines-scc": Forbidden: not usable by user or serviceaccount, provider "db2u-c-mas-masovh-system-scc": Forbidden: not usable by user or serviceaccount, provider restricted-v2: .containers[0].runAsUser: Invalid value: 2016: must be in the ranges: [1000290000, 1000299999], provider "restricted": Forbidden: not usable by user or serviceaccount, provider "nonroot-v2": Forbidden: not usable by user or serviceaccount, provider "nonroot": Forbidden: not usable by user or serviceaccount, provider "noobaa": Forbidden: not usable by user or serviceaccount, provider "hostmount-anyuid": Forbidden: not usable by user or serviceaccount, provider "machine-api-termination-handler": Forbidden: not usable by user or serviceaccount, provider "hostnetwork-v2": Forbidden: not usable by user or serviceaccount, provider "hostnetwork": Forbidden: not usable by user or serviceaccount, provider "hostaccess": Forbidden: not usable by user or serviceaccount, provider "rook-ceph": Forbidden: not usable by user or serviceaccount, provider "node-exporter": Forbidden: not usable by user or serviceaccount, provider "rook-ceph-csi": Forbidden: not usable by user or serviceaccount, provider "privileged": Forbidden: not usable by user or serviceaccount]
+----
+
+*Cause*
+
+Resource users don't have access to the required Service Accounts.
+
+*Solution*
+
+*Rook Ceph Operator*
+
+[source,bash]
+----
+oc -n rook-ceph get rs rook-ceph-operator-746677996c -oyaml | grep serviceAccount
+----
+
+[source,]
+----
+serviceAccount: rook-ceph-system
+serviceAccountName: rook-ceph-system
+----
+
+[source,bash]
+----
+oc -n rook-ceph get rs rook-ceph-operator-746677996c  -oyaml | oc adm policy scc-subject-review  --filename -
+----
+
+[source,]
+----
+RESOURCE                                   ALLOWED BY   
+ReplicaSet/rook-ceph-operator-746677996c   anyuid 
+----
+
+[source,bash]
+----
+oc adm policy add-scc-to-user anyuid -z rook-ceph-system
+
+oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:rook-ceph:rook-ceph-system
+oc adm policy add-scc-to-user anyuid -z rook-ceph-system -n rook-ceph
+oc adm policy add-scc-to-user privileged -z rook-ceph-system -n rook-ceph
+
+oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:rook-ceph:default
+oc adm policy add-scc-to-user anyuid -z default -n rook-ceph
+oc adm policy add-scc-to-user privileged -z default -n rook-ceph
+----
+
+Redeploy Operator.
+
+[source,bash]
+----
+oc -n rook-ceph scale deployment rook-ceph-operator --replicas=0
+oc -n openshift-storage scale deployment ocs-operator --replicas=0
+oc -n rook-ceph scale deployment -l app=rook-ceph-mon --replicas=0
+echo "Sleeping 5s..." ; sleep 5 ; echo "...wake up!"
+oc -n rook-ceph scale deployment -l app=rook-ceph-mon --replicas=1
+oc -n openshift-storage scale deployment ocs-operator --replicas=1
+oc -n rook-ceph scale deployment rook-ceph-operator --replicas=1
+----
+
+*Rook Ceph Monitor*
+
+[source,bash]
+----
+oc -n rook-ceph get rs rook-ceph-mon-c-64f848668b -oyaml | grep serviceAccount
+----
+
+[source,]
+----
+serviceAccount: rook-ceph-default
+serviceAccountName: rook-ceph-default
+----
+
+[source,bash]
+----
+oc -n rook-ceph get rs rook-ceph-mon-c-64f848668b -oyaml | oc adm policy scc-subject-review  --filename -
+----
+
+[source,]
+----
+RESOURCE                                ALLOWED BY                     
+ReplicaSet/rook-ceph-mon-c-64f848668b   db2u-c-mas-masovh-system-scc
+----
+
+[source,bash]
+----
+oc adm policy add-scc-to-user db2u-c-mas-masovh-system-scc -z rook-ceph-default
+oc adm policy add-scc-to-user db2u-c-mas-masovh-system-scc -z rook-ceph-default -n rook-ceph
+----
+
+*Rook Ceph MDS*
+
+[source,bash]
+----
+oc -n rook-ceph get rs rook-ceph-mgr-a-95f4697b9 -oyaml | grep serviceAccount
+----
+
+[source,]
+----
+serviceAccount: rook-ceph-mgr
+serviceAccountName: rook-ceph-mgr
+----
+
+[source,bash]
+----
+oc -n rook-ceph get rs rook-ceph-mgr-a-95f4697b9 -oyaml | oc adm policy scc-subject-review  --filename -
+----
+
+[source,]
+----
+RESOURCE                                ALLOWED BY                     
+ReplicaSet/rook-ceph-mgr-a-95f4697b9   db2u-c-mas-masovh-system-scc
+----
+
+[source,bash]
+----
+oc adm policy add-scc-to-user db2u-c-mas-masovh-system-scc -z rook-ceph-mgr
+oc adm policy add-scc-to-user db2u-c-mas-masovh-system-scc -z rook-ceph-mgr -n rook-ceph
+----
+
+*Rook Ceph OSD*
+
+[source,bash]
+----
+oc -n rook-ceph get rs rook-ceph-osd-1-c9c7f6b97 -oyaml | grep serviceAccount
+----
+
+[source,]
+----
+serviceAccount: rook-ceph-osd
+serviceAccountName: rook-ceph-osd
+----
+
+[source,bash]
+----
+oc -n rook-ceph get rs rook-ceph-osd-1-c9c7f6b97 -oyaml | oc adm policy scc-subject-review  --filename -
+----
+
+[source,]
+----
+RESOURCE                                ALLOWED BY                     
+ReplicaSet/rook-ceph-osd-1-c9c7f6b97   db2u-c-mas-masovh-system-scc
+----
+
+[source,bash]
+----
+oc adm policy add-scc-to-user db2u-c-mas-masovh-system-scc -z rook-ceph-osd
+oc adm policy add-scc-to-user db2u-c-mas-masovh-system-scc -z rook-ceph-osd -n rook-ceph
+----
+
+*CSI CephFS plugin*
+
+[source,bash]
+----
+oc -n rook-ceph get rs csi-cephfsplugin-provisioner-6668bdd9b -oyaml | grep serviceAccount
+----
+
+[source,]
+----
+serviceAccount: rook-csi-cephfs-provisioner-sa
+serviceAccountName: rook-csi-cephfs-provisioner-sa
+----
+
+[source,bash]
+----
+oc -n rook-ceph get rs csi-cephfsplugin-provisioner-6668bdd9b -oyaml | oc adm policy scc-subject-review  --filename -
+----
+
+[source,]
+----
+RESOURCE                                ALLOWED BY                     
+ReplicaSet/csi-cephfsplugin-provisioner-6668bdd9b   db2u-c-mas-masovh-system-scc
+----
+
+[source,bash]
+----
+oc adm policy add-scc-to-user db2u-c-mas-masovh-system-scc -z rook-csi-cephfs-provisioner-sa
+oc adm policy add-scc-to-user db2u-c-mas-masovh-system-scc -z rook-csi-cephfs-provisioner-sa -n rook-ceph
+----
+
+This might take a while to recover from.
+
+*CSI RBD Plugin*
+
+
+[source,bash]
+----
+oc -n rook-ceph get rs csi-rbdplugin-provisioner-57b5f57b9 -oyaml | grep serviceAccount
+----
+
+[source,]
+----
+serviceAccount: rook-csi-rbd-provisioner-sa
+serviceAccountName: rook-csi-rbd-provisioner-sa
+----
+
+[source,bash]
+----
+oc -n rook-ceph get rs csi-rbdplugin-provisioner-57b5f57b9 -oyaml | oc adm policy scc-subject-review  --filename -
+----
+
+[source,]
+----
+RESOURCE                                ALLOWED BY                     
+ReplicaSet/csi-cephfsplugin-provisioner-6668bdd9b   db2u-c-mas-masovh-system-scc
+----
+
+[source,bash]
+----
+oc adm policy add-scc-to-user db2u-c-mas-masovh-system-scc -z rook-csi-rbd-provisioner-sa
+oc adm policy add-scc-to-user db2u-c-mas-masovh-system-scc -z rook-csi-rbd-provisioner-sa -n rook-ceph
+----
+
+[NOTE]
+====
+Although it seems thi solution is not working, it ends up generating the POD 
+ after a while.
+
+Follow the POD and ReplicaSet state update using the following commands.
+
+.POD state change
+[source,bash]
+----
+oc -n rook-ceph get pod -w
+----
+
+.ReplicaSet state change
+[source,bash]
+----
+oc -n rook-ceph get rs -w
+----
+====
+
+== driver name rook-ceph.cephfs.csi.ceph.com not found
+
+*Problem*
+
+POD stays on Container Creating or Init and doesn't start.
+
+*Symptom*
+
+Describing the POD 
+[source,bash]
+----
+Events:
+  Type     Reason                  Age                     From                     Message
+  ----     ------                  ----                    ----                     -------
+...
+  Warning  FailedMount             5m2s (x107 over 3h50m)  kubelet                  MountVolume.MountDevice failed for volume "pvc-6289230b-0c9c-4116-a10d-9dfa830a9677" : kubernetes.io/csi: attacher.MountDevice failed to create newCsiDriverClient: driver name rook-ceph.cephfs.csi.ceph.com not found in the list of registered CSI drivers
+----
+
+Checking the DRIVERS value for the csinodes is lower than other nodes that
+ are working correctly (1 when it should be 3).
+
+[source,bash]
+----
+oc get csinode
+----
+
+[source,]
+----
+NAME               DRIVERS   AGE
+host-10-13-0-13    1         3h41m
+----
+
+*Cause*
+
+The csi-cephfsplugin and/or csi-rbdplugin _DaemonSet_ aren't deploying it's 
+ pods.
+
+[source,bash]
+----
+oc -n rook-ceph get ds
+----
+
+[source,]
+----
+NAME               DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR   AGE
+csi-cephfsplugin   9         0         0       0            0           <none>          7d21h
+csi-rbdplugin      9         0         0       0            0           <none>          7d21h
+----
+
+Check the problem by checking de _DaemonSet_ events.
+
+[source,bash]
+----
+oc  -n rook-ceph describe ds csi-cephfsplugin
+----
+
+[source,]
+----
+  Type     Reason        Age                    From                  Message
+  ----     ------        ----                   ----                  -------
+  Warning  FailedCreate  4m42s (x1003 over 4d)  daemonset-controller  Error creating: pods "csi-cephfsplugin-" is forbidden: unable to validate against any security context constraint: [provider "anyuid": Forbidden: not usable by user or serviceaccount, provider "pipelines-scc": Forbidden: not usable by user or serviceaccount, provider "db2u-c-mas-masovh-system-scc": Forbidden: not usable by user or serviceaccount, provider restricted-v2: .spec.securityContext.hostNetwork: Invalid value: true: Host network is not allowed to be used, spec.volumes[0]: Invalid value: "hostPath": hostPath volumes are not allowed to be used, spec.volumes[1]: Invalid value: "hostPath": hostPath volumes are not allowed to be used, spec.volumes[2]: Invalid value: "hostPath": hostPath volumes are not allowed to be used, spec.volumes[3]: Invalid value: "hostPath": hostPath volumes are not allowed to be used, spec.volumes[4]: Invalid value: "hostPath": hostPath volumes are not allowed to be used, spec.volumes[5]: Invalid value: "hostPath": hostPath volumes are not allowed to be used, spec.volumes[6]: Invalid value: "hostPath": hostPath volumes are not allowed to be used, spec.volumes[7]: Invalid value: "hostPath": hostPath volumes are not allowed to be used, spec.volumes[10]: Invalid value: "hostPath": hostPath volumes are not allowed to be used, spec.volumes[11]: Invalid value: "hostPath": hostPath volumes are not allowed to be used, provider restricted-v2: .containers[0].privileged: Invalid value: true: Privileged containers are not allowed, provider restricted-v2: .containers[0].hostNetwork: Invalid value: true: Host network is not allowed to be used, provider restricted-v2: .containers[1].privileged: Invalid value: true: Privileged containers are not allowed, provider restricted-v2: .containers[1].capabilities.add: Invalid value: "SYS_ADMIN": capability may not be added, provider restricted-v2: .containers[1].hostNetwork: Invalid value: true: Host network is not allowed to be used, provider restricted-v2: .containers[1].allowPrivilegeEscalation: Invalid value: true: Allowing privilege escalation for containers is not allowed, provider restricted-v2: .containers[2].privileged: Invalid value: true: Privileged containers are not allowed, provider restricted-v2: .containers[2].hostNetwork: Invalid value: true: Host network is not allowed to be used, provider "restricted": Forbidden: not usable by user or serviceaccount, provider "nonroot-v2": Forbidden: not usable by user or serviceaccount, provider "nonroot": Forbidden: not usable by user or serviceaccount, provider "noobaa": Forbidden: not usable by user or serviceaccount, provider "hostmount-anyuid": Forbidden: not usable by user or serviceaccount, provider "machine-api-termination-handler": Forbidden: not usable by user or serviceaccount, provider "hostnetwork-v2": Forbidden: not usable by user or serviceaccount, provider "hostnetwork": Forbidden: not usable by user or serviceaccount, provider "hostaccess": Forbidden: not usable by user or serviceaccount, provider "rook-ceph": Forbidden: not usable by user or serviceaccount, provider "node-exporter": Forbidden: not usable by user or serviceaccount, provider "rook-ceph-csi": Forbidden: not usable by user or serviceaccount, provider "privileged": Forbidden: not usable by user or serviceaccount]
+----
+
+*Solution*
+
+[.lead]
+For CephFS.
+
+[source,bash]
+----
+oc -n rook-ceph get ds csi-cephfsplugin -oyaml | grep serviceAccount
+----
+
+[source,]
+----
+serviceAccount: rook-csi-cephfs-plugin-sa
+serviceAccountName: rook-csi-cephfs-plugin-sa
+----
+
+[source,bash]
+----
+oc -n rook-ceph get ds csi-cephfsplugin -oyaml | oc adm policy scc-subject-review  --filename -
+----
+
+[source,]
+----
+RESOURCE                     ALLOWED BY   
+DaemonSet/csi-cephfsplugin   privileged
+----
+
+[source,bash]
+----
+oc adm policy add-scc-to-user privileged -z rook-csi-cephfs-plugin-sa -n rook-ceph
+----
+
+[.lead]
+For RBD.
+
+[source,bash]
+----
+oc -n rook-ceph get ds csi-rbdplugin -oyaml | grep serviceAccount
+----
+
+[source,]
+----
+serviceAccount: rook-csi-rbd-plugin-sa
+serviceAccountName: rook-csi-rbd-plugin-sa
+----
+
+[source,bash]
+----
+oc -n rook-ceph get ds csi-rbdplugin -oyaml | oc adm policy scc-subject-review  --filename -
+----
+
+[source,]
+----
+RESOURCE                  ALLOWED BY   
+DaemonSet/csi-rbdplugin   privileged
+----
+
+[source,bash]
+----
+oc adm policy add-scc-to-user privileged -z rook-csi-rbd-plugin-sa -n rook-ceph
+----
+
+
+*References*
+
+* csi-driver registration: https://rook.io/docs/rook/v1.12/Troubleshooting/ceph-csi-common-issues/#csi-driver-registration
+
+Other references:
+
+*  CSI-Plugin pods are not running on all OCP nodes: https://access.redhat.com/solutions/6760291
+* Chapter 10. Managing container storage interface (CSI) component placements: https://docs.redhat.com/en/documentation/red_hat_openshift_container_storage/4.7/html-single/managing_and_allocating_storage_resources/index#managing-container-storage-interface-component-placements_rhocs
+* Labeling OpenShift Data Foundation (ODF) nodes as infra nodes: https://access.redhat.com/solutions/4827161
+
+== Node missing rook pod (crashcollector, ceph-exporter)

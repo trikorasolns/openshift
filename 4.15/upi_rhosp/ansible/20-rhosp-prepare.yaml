@@ -1,0 +1,535 @@
+---
+- name: "Collect information"
+  import_playbook: _common_rhosp.yaml
+
+- name: "Check required variables"
+  hosts: "localhost"
+  gather_facts: true
+
+  tasks:
+  - name: "Check required variables"
+    ansible.builtin.assert:
+      that:
+        - ocp_cluster_name is defined and (ocp_cluster_name | length > 0)
+      fail_msg:
+        - "The name of the OCP cluster must be defined in the 'ocp_cluster_name' variable."
+
+- name: "Setup OpenStack Environment"
+  hosts: "localhost"
+  gather_facts: true
+
+  pre_tasks:
+
+  - name: "RHCOS image to use"
+    ansible.builtin.debug:
+      msg: 
+      - "CoreOS ISO disk location (coreos_image_location): {{ coreos_image_location }}"
+      - "CoreOS ISO disk file name: {{ coreos_image_filename }}"
+
+  tasks:
+
+  - name: "Check if cluster image exists"
+    openstack.cloud.image_info:
+      image: "{{ rhosp_rhcoreos_image_name }}"
+      # region_name: "{{ openstack_region }}"
+    register: openstack_image_coreos_res
+
+  - name: "RHCOS output"
+    ansible.builtin.debug:
+      var: openstack_image_coreos_res
+
+  - name: "Upload RHCOS image (TODO)"
+    openstack.cloud.image:
+      image: "{{ rhosp_rhcoreos_image_name }}"
+      container_format: bare
+      disk_format: qcow2
+      state: present
+      filename: "{{ coreos_image_location }}"
+      # kernel: cirros-vmlinuz
+      # ramdisk: cirros-initrd
+      tags:
+        - rhcos
+        - "{{ ocp_cluster_name }}"
+        - openshift
+      properties:
+        cpu_arch: x86_64
+        distro: rhcos
+    register: openstack_image_coreos_upload_res
+    when: openstack_image_coreos_res.failed or (openstack_image_force_upload is defined and openstack_image_force_upload | bool)
+
+- name: "Setup OpenStack Network"
+  import_playbook: 20.3-rhosp-prepare-network.yaml
+
+  # - name: "Fetch API floating IP information"
+  #   openstack.cloud.floating_ip_info:
+  #     description: "{{ rhosp_fip_api_name }}"
+  #   register: fip_api_info
+
+  # - name: "Fetch Ingress floating IP information"
+  #   openstack.cloud.floating_ip_info:
+  #     description: "{{ rhosp_fip_ingress_name }}"
+  #   register: fip_ingress_info
+
+  # - name: "Fetch Bootstrap floating IP information"
+  #   openstack.cloud.floating_ip_info:
+  #     description: "{{ rhosp_fip_bootstrap_name }}"
+  #   register: fip_bootstrap_info
+
+  # - name: "OpenStack Floating IP info"
+  #   ansible.builtin.debug:
+  #     msg:
+  #       - "fip_api_info ({{ fip_api_info.floating_ips | length }}): {{ fip_api_info }}"
+  #       - "fip_ingress_info ({{ fip_ingress_info.floating_ips | length }}): {{ fip_ingress_info }}"
+  #       - "fip_bootstrap_info ({{ fip_bootstrap_info.floating_ips | length }}): {{ fip_bootstrap_info }}"
+
+  # - name: "Create API floating IP if it doesn't exist"
+  #   ansible.builtin.shell: |
+  #     openstack floating ip create --description "{{ rhosp_fip_api_name }}" {{ openstack_ext_network | default('Ext-Net') }}
+  #   when: fip_api_info.floating_ips | length == 0
+  #   register: fip_api_create
+
+  # - name: "Create Ingress floating IP if it doesn't exist"
+  #   ansible.builtin.shell: |
+  #     openstack floating ip create --description "{{ rhosp_fip_ingress_name }}" {{ openstack_ext_network | default('Ext-Net') }}
+  #   when: fip_ingress_info.floating_ips | length == 0
+  #   register: fip_ingress_create
+
+  # - name: "Create Bootstrap floating IP if it doesn't exist"
+  #   ansible.builtin.shell: |
+  #     openstack floating ip create --description "{{ rhosp_fip_bootstrap_name }}" {{ openstack_ext_network | default('Ext-Net') }}
+  #   when: fip_bootstrap_info.floating_ips | length == 0
+  #   register: fip_bootstrap_create
+
+  # - name: "OpenStack API Floating IP creation info"
+  #   ansible.builtin.debug:
+  #     var: fip_api_create
+  #   when: fip_api_create is defined
+
+  # - name: "OpenStack Ingress Floating IP creation info"
+  #   ansible.builtin.debug:
+  #     var: fip_ingress_create
+  #   when: fip_ingress_create is defined
+
+  # - name: "OpenStack Bootstrap Floating IP creation info"
+  #   ansible.builtin.debug:
+  #     var: fip_bootstrap_create
+  #   when: fip_bootstrap_create is defined
+
+  # - name: "Set the external IPs for API and APPS"
+  #   ansible.builtin.set_fact:
+  #     openstack_fip_api_address: "{% if fip_api_create.skipped is defined and fip_api_create.skipped | bool %}{{ fip_api_info.floating_ips[0].floating_ip_address }}{% else %}{{ fip_api_create.stdout }}{% endif %}"
+  #     openstack_fip_apps_address: "{% if fip_ingress_create.skipped is defined and fip_ingress_create.skipped | bool %}{{ fip_ingress_info.floating_ips[0].floating_ip_address }}{% else %}{{ fip_ingress_create.stdout }}{% endif %}"
+  #     openstack_fip_bootstrap_address: "{% if fip_bootstrap_create.skipped is defined and fip_bootstrap_create.skipped | bool %}{{ fip_bootstrap_info.floating_ips[0].floating_ip_address }}{% else %}{{ fip_bootstrap_create.stdout }}{% endif %}"
+
+# # Load Balancer - 20.5-rhosp-load-balancer.yaml
+# - name: "Collect information"
+#   import_playbook: 20.5-rhosp-load-balancer.yaml
+
+  # - name: "Create Load Balancer"
+  #   openstack.cloud.loadbalancer:
+  #     name: "{{ rhosp_loadbalancer_prefix }}-public"
+  #     vip_network: "{{ rhosp_network }}"
+  #     floating_ip_address: "{{ openstack_fip_api_address }}"
+  #     state: present
+
+  # - name: "Create private Load Balancer"
+  #   openstack.cloud.loadbalancer:
+  #     name: "{{ rhosp_loadbalancer_prefix }}-internal"
+  #     vip_network: "{{ rhosp_network }}"
+  #     state: present
+  #   register: rhosp_lb_private_res
+
+  # - name: "Create private Load Balancer DNS records"
+  #   ansible.builtin.debug:
+  #     msg:
+  #     - "Create a DNS registries"
+  #     - "A record for api-int.{{ ocp_cluster_name }}.{{ local_domain}} with IP {{ rhosp_lb_private_res }}"
+  #     - "A record for bootstrap.{{ ocp_cluster_name }}.{{ local_domain}} with IP {{ openstack_fip_bootstrap_address }}"
+  #   register: rhosp_lb_private_res
+
+
+  # - name: "MANUAL STEP: Create private Load Balancer DNS records"
+  #   ansible.builtin.pause:
+
+  # - name: "Create load-balancer listeners"
+  #   openstack.cloud.lb_listener:
+  #     name: "{{ item.name }}"
+  #     load_balancer: "{{ rhosp_loadbalancer_prefix }}-public"
+  #     protocol: "{{ item.protocol }}"
+  #     protocol_port: "{{ item.port }}"
+  #     state: present
+  #   loop:
+  #   - {name: "api-server", port: 6443, protocol: "TCP"}
+  #   - {name: "https", port: 443, protocol: "TCP"}
+  #   - {name: "http", port: 80, protocol: "TCP"}
+  #   - {name: "stats", port: 9000, protocol: "TCP"}
+
+  # - name: "Create load-balancer listeners"
+  #   openstack.cloud.lb_listener:
+  #     name: "{{ item.name }}"
+  #     load_balancer: "{{ rhosp_loadbalancer_prefix }}-internal"
+  #     protocol: "{{ item.protocol }}"
+  #     protocol_port: "{{ item.port }}"
+  #     state: present
+  #   loop:
+  #   - {name: "bootstrap", port: 22623, protocol: "TCP"}
+
+  # - name: "Create  public load-balancer pool"
+  #   openstack.cloud.lb_pool:
+  #     name: "{{ rhosp_loadbalancer_pool_name }}-public"
+  #     lb_algorithm: "ROUND_ROBIN"
+  #     loadbalancer: "{{ rhosp_loadbalancer_prefix }}-public"
+  #     protocol: "TCP"
+  #     state: present
+
+  # - name: "Create private load-balancer pool"
+  #   openstack.cloud.lb_pool:
+  #     name: "{{ rhosp_loadbalancer_pool_name }}-internal"
+  #     lb_algorithm: "ROUND_ROBIN"
+  #     loadbalancer: "{{ rhosp_loadbalancer_prefix }}-internal"
+  #     protocol: "TCP"
+  #     state: present
+
+# - name: "Setup DNS"
+#   hosts: "localhost"
+#   gather_facts: true
+
+#   tasks:
+#   - name: "Set names for DNS queries"
+#     ansible.builtin.set_fact:
+#       api_dns_name: "api.{{ ocp_cluster_name }}.{{ local_domain}}"
+#       apps_dns_name: "console.apps.{{ ocp_cluster_name }}.{{ local_domain}}"
+
+#   - name: "Fetch DNS for API and APPS"
+#     ansible.builtin.set_fact:
+#       dnslookup_api: "{{ query('community.dns.lookup', api_dns_name) }}"
+#       dnslookup_apps: "{{ query('community.dns.lookup', apps_dns_name) }}"
+    
+#   - name: Look up A (IPv4) records for example.org
+#     ansible.builtin.debug:
+#       msg: 
+#       - "dnslookup_api: {{ dnslookup_api }}"
+#       - "dnslookup_apps: {{ dnslookup_api }}"
+#       - "dnslookup_apps: {{ query('community.dns.lookup', 'www.trikorasolutions.com') }}"
+
+#   # - name: "TODO: Create DNS records for API and APPS"
+#   #   ansible.builtin.debug:
+#   #     msg: 
+#   #     - "TO BE AUTOMATED!!!"
+#   #     - "Create these two records in your DNS zone:"
+#   #     - 
+#   #     - "api.{{ ocp_subdomain }}.    A {{ openstack_fip_api_address }}"
+#   #     - "*.apps.{{ ocp_subdomain }}. A {{ openstack_fip_apps_address }}"
+
+#   - name: "WARNING: No DNS addresses found for API and/or APPS, create them manually"
+#     ansible.builtin.debug:
+#       msg: 
+#       - "TO BE AUTOMATED!!!"
+#       - "Create these two records in your DNS zone:"
+#       - ""
+#       - "api.{{ ocp_subdomain }}.    A {{ openstack_fip_api_address }}"
+#       - "*.apps.{{ ocp_subdomain }}. A {{ openstack_fip_apps_address }}"
+#     when: (dnslookup_api | length == 0) or (dnslookup_apps | length == 0)
+
+#   - name: "WARNING: Mismatch DNS addresses for API, fix it manually"
+#     ansible.builtin.debug:
+#       msg: 
+#       - "TO BE AUTOMATED!!!"
+#       - "api.{{ ocp_subdomain }} should be {{ openstack_fip_api_address }} but is {{ dnslookup_api[0] }}"
+#       - ""
+#       - "These two records should exist in your DNS zone:"
+#       - ""
+#       - "api.{{ ocp_subdomain }}.    A {{ openstack_fip_api_address }}"
+#       - "*.apps.{{ ocp_subdomain }}. A {{ openstack_fip_apps_address }}"
+#     when: (dnslookup_api | length > 0 and dnslookup_api[0] != openstack_fip_api_address)
+
+#   - name: "WARNING: Mismatch DNS addresses for APPS, fix it manually"
+#     ansible.builtin.debug:
+#       msg: 
+#       - "TO BE AUTOMATED!!!"
+#       - "*.apps.{{ ocp_subdomain }} should be {{ openstack_fip_apps_address }} but is {{ dnslookup_apps[0] }}"
+#       - 
+#       - "These two records should exist in your DNS zone:"
+#       - 
+#       - "api.{{ ocp_subdomain }}.    A {{ openstack_fip_api_address }}"
+#       - "*.apps.{{ ocp_subdomain }}. A {{ openstack_fip_apps_address }}"
+#     when: (dnslookup_apps | length > 0 and dnslookup_apps[0] != openstack_fip_apps_address)
+
+#   - name: "Create private Load Balancer DNS records"
+#     ansible.builtin.debug:
+#       msg:
+#       - "Create a DNS registries"
+#       - "A record for api-int.{{ ocp_cluster_name }}.{{ local_domain}} with IP {{ rhosp_lb_private_res }}"
+#       - "A record for bootstrap.{{ ocp_cluster_name }}.{{ local_domain}} with IP {{ openstack_fip_bootstrap_address }}"
+#     register: rhosp_lb_private_res
+
+#   - name: "MANUAL STEP: Create private Load Balancer DNS records"
+#     ansible.builtin.pause:
+
+  # - name: "Wait for DNS propagation"
+  #   ansible.builtin.debug:
+  #     msg: "Wait for DNS propagation..."
+  #   until: (lookup('community.general.dig', api_dns_name) == openstack_fip_api_address) and (lookup('community.general.dig', apps_dns_name) == openstack_fip_apps_address)
+  #   retries: 30
+  #   delay: 10
+  #   when: skip_dns is undefined or not (skip_dns | bool)
+  #   # reg: wait_for_dns_propagation_res
+
+  # - name: "WARNING: Mismatch DNS addresses for APPS, fix it manually"
+  #   ansible.builtin.debug:
+  #     var: wait_for_dns_propagation_res
+
+  # - name: "MANUAL STEP: Pause until the DNS records for API and APPS are created."
+  #   ansible.builtin.pause:
+  #   when: (dnslookup_api | length == 0) or (dnslookup_apps | length == 0) or (dnslookup_api[0] != openstack_fip_api_address) or (dnslookup_apps[0] != openstack_fip_apps_address)
+
+
+
+# Bootstrap Ignition Image
+- name: "Generate Bootstrap Ignition Image"
+  import_playbook: 20.1-rhosp-prepare-bootstrap-ign-img.yaml
+
+  # - name: "Read the bootstrap ignition file as JSON"
+  #   ansible.builtin.set_fact:
+  #     bootstrap_ignition: "{{ lookup('file','/tmp/bootstrap-{{ metadata_json.infraID }}.ign') | from_json }}"
+  #     hostname_b64: "{{ ocp_infra_id + '-bootstrap\n' | base64 }}"
+  #     bootstrap_ignition_hostname_file: { path: '/etc/hostname', 'mode': 420, 'contents': { 'source': 'data:text/plain;charset=utf-8;base64,{{ hostname_b64 }}',    },}
+    
+  # - name: "Add the bootstrap hostname"
+  #   ansible.builtin.set_fact:
+  #     bootstrap_ignition: "{{ boootstrap_ignition }}"
+  #   # ansible.utils.update_fact:
+  #   #   updates:
+  #   #     - path: boootstrap_ignition.storage.files
+  #   #       value: 10
+  #   #   : 
+
+  # - name: "Print result"
+  #   ansible.builtin.debug:
+  #     var: openstack_image_bootstrap_ign_res
+
+  # - name: "Check if the Boostrap Ignition image exists"
+  #   openstack.cloud.image_info:
+  #     image: "{{ rhosp_ocp_bootstrap_ign_image_name }}"
+  #   register: openstack_image_bootstrap_ign_res
+
+  # - name: "Print result"
+  #   ansible.builtin.debug:
+  #     var: openstack_image_bootstrap_ign_res
+
+  # - name: "Upload the Boostrap Ignition to Glance"
+  #   openstack.cloud.image:
+  #     name: "{{ rhosp_ocp_bootstrap_ign_image_name }}"
+  #     filename: "/tmp/bootstrap-{{ metadata_json.infraID }}.ign"
+  #     container_format: bare
+  #     disk_format: raw
+  #     state: present
+  #     tags:
+  #       - rhcos
+  #       - "{{ ocp_infra_id }}"
+  #       - openshift
+  #       - "{{ ocp_cluster_id_tag }}"
+  #   register: openstack_image_bootstrap_ign_upload_res
+  #   when: openstack_image_bootstrap_ign_res.failed or openstack_image_bootstrap_ign_res.images | length == 0
+
+  # - name: "Check if the Boostrap Ignition image exists"
+  #   openstack.cloud.image_info:
+  #     image: "{{ rhosp_ocp_bootstrap_ign_image_name }}"
+  #   register: openstack_image_bootstrap_ign_res
+  #   failed_when: openstack_image_bootstrap_ign_res.failed or openstack_image_bootstrap_ign_res.images | length == 0
+
+  # - name: "Print result"
+  #   ansible.builtin.debug:
+  #     var: openstack_image_bootstrap_ign_res
+
+  # - name: "Set Bootstrap Ignition image Glance file location"
+  #   ansible.builtin.set_fact:
+  #     rhosp_ocp_bootstrap_ign_file: "{{ openstack_image_bootstrap_ign_res.images[0].file }}"
+
+  # - name: "Fetch Glance token"
+  #   ansible.builtin.shell: |
+  #     openstack token issue -c id -f value
+  #   register: glance_token_res
+
+  # - name: "Set Glance token"
+  #   ansible.builtin.set_fact:
+  #     glance_token: "{{ glance_token_res.stdout }}"
+
+  # # - name: "Fetch Glance information"
+  # #   openstack.cloud.catalog_service_info:
+  # #     name: glance
+  # #   register: rhosp_catalog_glance_res
+
+  # # - name: "Print glance catalog"
+  # #   ansible.builtin.debug:
+  # #     var: rhosp_catalog_glance_res
+
+  # - name: "Fetch Glance Bootstrap URL"
+  #   ansible.builtin.shell: |
+  #     #$(openstack catalog show glance -f json | jq -r '.endpoints[] | select(.interface=="public").url')$(openstack image show -f value -c file {{ rhosp_ocp_bootstrap_ign_image_name }})
+  #     openstack catalog show glance -f json | jq -r '.endpoints[] | select((.region=="{{ rhosp_region_name }}") and (.interface=="public")).url'
+  #   register: rhosp_catalog_glance_res
+
+  # - name: "Set ignition file HTTPS location"
+  #   ansible.builtin.set_fact:
+  #     bootstrap_url: "{{ rhosp_catalog_glance_res.stdout }}/{{ rhosp_ocp_bootstrap_ign_file }}"
+
+  # - name: "Print bootstrap ignition file Glance URL"
+  #   ansible.builtin.debug:
+  #     msg: 
+  #     - "bootstrap_url: {{ bootstrap_url }}"
+  #     - "{{ api_dns_name }}: {{ lookup('community.general.dig', api_dns_name) }}"
+  #     - "{{ api_dns_name }} ({{ openstack_fip_api_address }}): {{ lookup('community.general.dig', api_dns_name) }}"
+  #     - "{{ apps_dns_name }} ({{ openstack_fip_apps_address }}): {{ lookup('community.general.dig', apps_dns_name) }}"
+# /Bootstrap Ignition Image
+
+# - name: "DNS"
+#   hosts: "localhost"
+#   gather_facts: true
+
+#   tasks:
+
+#   - name: "Wait for DNS propagation"
+#     ansible.builtin.debug:
+#       msg: "Wait for DNS propagation..."
+#     until: (lookup('community.general.dig', api_dns_name) == openstack_fip_api_address) and (lookup('community.general.dig', apps_dns_name) == openstack_fip_apps_address)
+#     retries: 30
+#     delay: 10
+#     when: skip_dns is undefined or not (skip_dns | bool)
+
+# Network
+## Security Groups
+  # - name: 'Create the security groups'
+  #   openstack.cloud.security_group:
+  #     name: "{{ infraID }}-{{ item }}"
+  #   loop:
+  #     - "master"
+  #     - "worker"
+
+## Update Network, Subnet, Router and ports
+
+# Bootstrap
+- name: "Deploy Bootrap instances"
+  import_playbook: 20.6-rhosp-bootstrap-instance.yaml
+
+  # - name: "Template bootstrap ignition Shim"
+  #   ansible.builtin.template:
+  #     src: bootstrap-ignition-shim.json.j2
+  #     dest: "/tmp/bootstrap-{{ metadata_json.infraID }}-shim.ign"
+
+  # # - name: 'Create the bootstrap server port'
+  # #   openstack.cloud.port:
+  # #     name: "{{ metadata_json.infraID }}-bootstrap-port"
+  # #     network: "{{ rhosp_network }}"
+  # #     security_groups:
+  # #     - "{{ infraID }}-master"
+  #     # allowed_address_pairs:
+  #     # - ip_address: "{{ os_apiVIP }}"
+
+  # # - name: 'Set bootstrap port tag'
+  # #   ansible.builtin.shell: |
+  # #     openstack port set --tag {{ cluster_id_tag }} {{ metadata_json.infraID }}-bootstrap-port
+  # #   register: bootstrap_port_tag_res
+
+  # # - name: "Print bootstrap port tag result"
+  # #   ansible.builtin.debug:
+  # #     msg: 
+
+  # - name: 'Set bootstrap auto_ip to false'
+  #   ansible.builtin.set_fact:
+  #     bootstrap_auto_ip: false
+  #   when: openstack_fip_bootstrap_address is not defined
+
+  # - name: 'Check if the bootstrap server exists'
+  #   openstack.cloud.server_info:
+  #     name: "{{ rhosp_bootstrap_server_name }}"
+  #   register: rhosp_bootstrap_server_info
+
+  # - name: "Print bootstrap server info"
+  #   ansible.builtin.debug:
+  #     var: rhosp_bootstrap_server_info
+  #     verbosity: 2
+
+  # - name: 'Create the bootstrap server'
+  #   openstack.cloud.server:
+  #     name: "{{ rhosp_bootstrap_server_name }}"
+  #     image: "{{ rhosp_rhcoreos_image_name }}"
+  #     flavor: "{{ rhosp_flavor_master }}"
+  #     userdata: "{{ lookup('file', '/tmp/bootstrap-' + metadata_json.infraID + '-shim.ign') | string }}"
+  #     network: "{{ rhosp_network }}"
+  #     floating_ips: "{{ openstack_fip_bootstrap_address | default(omit) }}"
+  #     auto_ip: "{{ bootstrap_auto_ip | default(omit) }}"
+  #     # nics:
+  #     # - port-name: "{{ os_port_bootstrap }}"
+  #     meta: "{{ ocp_cluster_id_tag }}"
+  #     # wait: false # due to TypeError: 'NoneType' object is not subscriptable
+  #   when: rhosp_bootstrap_server_info.servers | length == 0
+
+  # - name: "Delete Bootstrap Ignition image"
+  #   openstack.cloud.image:
+  #     name: "{{ rhosp_ocp_bootstrap_ign_image_name }}"
+  #     state: absent
+
+# Control Plane
+
+- name: "Deploy Control Plane Instances"
+  import_playbook: 20.7-rhosp-control-plane-instance.yaml
+
+  # - name: "Check if the Control Plane servers exists"
+  #   openstack.cloud.server_info:
+  #     name: "{{ rhosp_control_plane_server_prefix }}"
+  #   register: rhosp_controlplane_server_info
+
+  # - name: "Print Control Plane server info"
+  #   ansible.builtin.debug:
+  #     var: rhosp_controlplane_server_info
+  #     verbosity: 2
+
+  # - name: 'Create the Control Plane servers'
+  #   openstack.cloud.server:
+  #     name: "{{ rhosp_control_plane_server_prefix }}-{{ item }}"
+  #     image: "{{ rhosp_rhcoreos_image_name }}"
+  #     flavor: "{{ rhosp_flavor_master }}"
+  #     userdata: "{{ lookup('file', '/tmp/master-' + metadata_json.infraID + '.ign') | string }}"
+  #     network: "{{ rhosp_network }}"
+  #     # nics:
+  #     # - port-name: "{{ os_port_controlplane }}"
+  #     meta: "{{ ocp_cluster_id_tag }}"
+  #     # wait: false # due to TypeError: 'NoneType' object is not subscriptable
+  #     security_groups:
+  #     - default
+  #   when: rhosp_controlplane_server_info.servers | length < 3
+  #   loop: "{{ [rhosp_controlplane_server_info.servers | length +1 ,3] | flatten(1) }}"
+
+  # - name: "Add members to the public load-balancer pool"
+  #   openstack.cloud.lb_member:
+  #     name: "{{ rhosp_control_plane_server_prefix }}-{{ item }}"
+  #     pool: "{{ rhosp_loadbalancer_pool_name }}-public"
+  #     state: present
+  #   loop: "{{ [1 ,3] | flatten(1) }}"
+
+  # - name: "Add members to the private load-balancer pool"
+  #   openstack.cloud.lb_member:
+  #     name: "{{ rhosp_control_plane_server_prefix }}-{{ item }}"
+  #     pool: "{{ rhosp_loadbalancer_pool_name }}-internal"
+  #     state: present
+  #   loop: "{{ [1 ,3] | flatten(1) }}"
+
+  # - name: "Fetch server info"
+  #   openstack.cloud.server_info:
+  #     name: "{{ rhosp_control_plane_server_prefix }}"
+  #   register: rhosp_controlplane_server_info
+
+# Load Balancer - 20.14-rhosp-load-balancer.yaml
+- name: "Load Balancer"
+  import_playbook: 20.14-rhosp-load-balancer.yaml
+
+# Load Balancer Members - 220.15-rhosp-load-balancer-members.yaml
+# - name: "Load Balancer Members"
+#   import_playbook: 20.15-rhosp-load-balancer-members.yaml
+
+# Print DNS information
+- name: "Print DNS information"
+  import_playbook: 29-rhosp-print-dns-info.yaml
+
+...

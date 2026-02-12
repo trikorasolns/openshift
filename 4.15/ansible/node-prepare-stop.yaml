@@ -1,0 +1,44 @@
+---
+- name: "Cordon and drain node"
+  hosts: "localhost"
+  gather_facts: true
+
+  pre_tasks:
+  - name: "Check variables"
+    ansible.builtin.assert:
+      that:
+      - nodename is defined and nodename | length > 0
+      fail_msg:
+      - "nodename must be defined with the OpenShift node name."
+
+  tasks:
+  - name: "Uncordon the node"
+    ansible.builtin.shell: |
+      oc adm cordon {{ nodename }}
+    register: oc_adm_cordon_res
+
+  - name: "Print cordon result"
+    ansible.builtin.debug:
+      var: oc_adm_cordon_res
+
+  - name: "Drain node"
+    ansible.builtin.shell: |
+      oc adm drain {{ nodename }}
+    register: oc_adm_drain_res
+    failed_when: false
+
+  - name: "Print drain result"
+    ansible.builtin.debug:
+      var: oc_adm_drain_res
+
+  - name: "Drain force"
+    ansible.builtin.shell: |
+      oc adm drain {{ nodename }} --delete-emptydir-data --ignore-daemonsets
+    when: oc_adm_drain_res.rc != 0
+    register: oc_adm_drain_force_res
+
+  - name: "Print drain force result"
+    ansible.builtin.debug:
+      var: oc_adm_drain_force_res
+    when: oc_adm_drain_force_res is defined
+...

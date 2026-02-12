@@ -1,0 +1,99 @@
+---
+- name: "Check restart"
+  hosts: "localhost"
+  gather_facts: true
+
+  tasks:
+  - name: "Check variables"
+    ansible.builtin.assert:
+      that:
+      - nodename is defined and nodename | length > 0
+      - rhosp_instance_name is defined and rhosp_instance_name | length > 0
+      fail_msg:
+      - "nodename must be defined with the OpenShift node name."
+      - "rhosp_instance_name must be defined with the name of the RHOSP instance."
+
+- name: "Prepare node to stop"
+  ansible.builtin.include_playbook: ../../ansible/node-prepare-stop.yaml
+
+- name: "Cordon and drain node"
+  hosts: "localhost"
+  gather_facts: true
+
+  tasks:
+  # - name: "Cordon the node"
+  #   ansible.builtin.include_tasks:
+  #     file: ../../ansible/tasks/node-prepare-to-stop.yaml
+
+  # - name: "Print cordon result"
+  #   ansible.builtin.debug:
+  #     var: oc_adm_cordon_res
+
+  # - name: "Drain node"
+  #   ansible.builtin.shell: |
+  #     oc adm drain {{ nodename }}
+  #   register: oc_adm_drain_res
+  #   failed_when: false
+
+  # - name: "Print drain result"
+  #   ansible.builtin.debug:
+  #     var: oc_adm_drain_res
+
+  # - name: "Drain force"
+  #   ansible.builtin.shell: |
+  #     oc adm drain {{ nodename }} --delete-emptydir-data --ignore-daemonsets
+  #   when: oc_adm_drain_res.rc != 0
+  #   register: oc_adm_drain_force_res
+
+  # - name: "Print drain force result"
+  #   ansible.builtin.debug:
+  #     var: oc_adm_drain_force_res
+  #   when: oc_adm_drain_force_res is defined
+
+  - name: "Stop the RHOSP instance"
+    openstack.cloud.server_action:
+      action: stop
+      server: "{{ rhosp_instance_name }}"
+      timeout: 200
+
+  - name: "Wait for the VM to stop"
+    openstack.cloud.server_info:
+      name: "{{ rhosp_instance_name }}"
+    register: rhosp_instance_info
+    until: "rhosp_instance_info.servers[0].status == 'SHUTOFF'"
+    retries: 30
+    delay: 2
+
+  - name: "Start the RHOSP instance"
+    openstack.cloud.server_action:
+      action: start
+      server: "{{ rhosp_instance_name }}"
+      timeout: 200
+
+  # - name: "Wait for the VM to start"
+  #   openstack.cloud.server_info:
+  #     name: "{{ rhosp_instance_name }}"
+  #   register: rhosp_instance_info
+  #   until: "rhosp_instance_info.servers[0].status == 'ACTIVE'"
+  #   retries: 30
+  #   delay: 2
+
+  # - name: "Print wait result"
+  #   ansible.builtin.debug:
+  #     msg: 
+  #     - "rhosp_instance_info: {{ rhosp_instance_info }}"
+  #     - "rhosp_instance_info: {{ rhosp_instance_info | to_json }}"
+
+  # - name: "Uncordon the node"
+  #   ansible.builtin.shell: |
+  #     oc adm uncordon {{ nodename }}
+  #   register: oc_adm_uncordon_res
+
+  # - name: "Print uncordon result"
+  #   ansible.builtin.debug:
+  #     var: oc_adm_uncordon_res
+
+- name: "Prepare node to stop"
+  ansible.builtin.include_playbook: ../../ansible/node-post-start.yaml
+
+...

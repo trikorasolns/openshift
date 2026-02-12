@@ -1,0 +1,120 @@
+= Rook on OpenShift
+Antonio C. <ac (at) trikorasolutions (dot) com>
+:revdate: {docdate}
+:icons: font
+:toc: left
+:toclevels: 3
+:toc-title: Table of Contents
+:description: Rook on OpenShift
+
+== Introduction
+
+[.lead]
+This document is WIP and describes the deployment of the OpenShift Data 
+ Foundation operator and a Ceph storage.
+
+== Storage
+
+References:
+
+* https://rook.io/docs/rook/latest-release/Getting-Started/quickstart/#storage
+
+=== Block Storage
+
+[source,bash]
+----
+oc create -f ocp/storage/rook/ansible/files/rook-ceph-blockstore.yaml
+----
+
+* Block Storage: https://rook.io/docs/rook/latest-release/Storage-Configuration/Block-Storage-RBD/block-storage/
+
+=== Shared File System
+
+[source,bash]
+----
+oc create -f ocp/storage/rook/ansible/files/rook-ceph-filesystem.yaml
+----
+
+Shared File System Storage class.
+
+[source,bash]
+----
+oc create -f ocp/storage/rook/ansible/files/rook-ceph-filesystem-sc.yaml
+----
+
+
+* Shared FS: https://rook.io/docs/rook/latest-release/Storage-Configuration/Shared-Filesystem-CephFS/filesystem-storage/
+
+
+=== Object Storage
+
+[source,bash]
+----
+oc create -f ocp/storage/rook/ansible/files/rook-ceph-objectstore.yaml
+----
+
+* Object Storage: https://rook.io/docs/rook/latest-release/Storage-Configuration/Object-Storage-RGW/object-storage/
+
+== Test
+
+=== Block Storage
+
+[source,bash]
+----
+oc create -f ocp/storage/rook/ansible/files/test-rook-bs.yaml
+----
+
+[source,bash]
+----
+oc delete -f ocp/storage/rook/ansible/files/test-rook-bs.yaml
+----
+
+=== CephFS
+
+To test the configuration execute the following configuration that will deploy 
+ an nginx pod with a volume attached to a PVC. The PVC should provision a PV
+ automatically.
+
+[source,bash]
+----
+oc apply -f ocp/storage/rook/ansible/files/test-rook-fs.yaml
+----
+
+[source,bash]
+----
+oc get pvc
+----
+
+[source,]
+----
+NAME                   STATUS    VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+pvc-rook-cephfs-test   Pending                                      rook-cephfs    11s
+----
+
+Delete manila test.
+
+[source,bash]
+----
+oc delete -f ocp/storage/rook/ansible/files/test-rook-fs.yaml
+----
+
+== Helpfull tools
+
+Execute Rook tools.
+
+[source,bash]
+----
+kubectl -n rook-ceph exec -it $(kubectl -n rook-ceph get pod -l "app=rook-ceph-tools" -o jsonpath='{.items[*].metadata.name}') bash
+----
+
+== References
+
+* https://rook.io/docs/rook/latest-release/Getting-Started/ceph-openshift/
+* https://rook.io/docs/rook/latest-release/Getting-Started/quickstart/
+* Dashboard: https://rook.io/docs/rook/latest-release/Storage-Configuration/Monitoring/ceph-dashboard/
+Toolbox: https://rook.io/docs/rook/latest-release/Getting-Started/quickstart/#tools
+
+
+== Troubleshooting
+
+Check the link:troubleshooting.adoc[Troubleshooting] document.

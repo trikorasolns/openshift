@@ -1,0 +1,32 @@
+apiVersion: v1
+baseDomain: {{ local_domain }}
+metadata:
+  name: {{ ocp_cluster_name }}
+
+compute:
+- hyperthreading: Enabled
+  name: worker
+  replicas: 0
+
+controlPlane:
+  hyperthreading: Enabled
+  name: master
+  replicas: 3
+
+networking:
+  clusterNetwork:
+  - cidr: {{ rhsop_subnet_range | default('10.128.0.0/14') }}
+    hostPrefix: 23 
+  networkType: OVNKubernetes
+  serviceNetwork: 
+  - 172.30.0.0/16
+
+platform:
+  none: {}
+
+fips: false
+
+## The pull secret that provides components in the cluster access to images for OpenShift components.
+pullSecret: '{{ pull_secret }}'
+## The default SSH key that will be programmed for `core` user.
+sshKey: '{{ ssh_pub_key }}'   

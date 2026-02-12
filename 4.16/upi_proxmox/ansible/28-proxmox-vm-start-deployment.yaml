@@ -1,0 +1,110 @@
+---
+- name: "Setup Proxmox VMs to deploy OCP"
+  hosts: "proxmox_nodes"
+  gather_facts: true
+
+  pre_tasks:
+  - name: "Affected groups"
+    ansible.builtin.set_fact:
+      selected_groups: ['ocp_bootstrap','ocp_control_plane']
+    when: selected_groups is undefined or selected_groups | length == 0
+
+  tasks:
+    # - name: "Build VM list"
+    #   ansible.builtin.set_fact:
+    #     # vm_host_list: "{{ (groups['ocp_bootstrap'] | default([])) + (groups['ocp_control_plane'] | default([])) + (groups['ocp_compute_node'] | default([])) }}"
+    #     vm_host_list: "{{ (groups['ocp_bootstrap'] | default([])) + (groups['ocp_control_plane'] | default([])) }}"
+
+    - name: "Build VM list"
+      ansible.builtin.set_fact:
+        vm_host_list: "{{ (vm_host_list | default([]) ) + (groups[item] | default([])) }}"
+      loop: "{{ selected_groups }}"
+      when: vm_host_list is undefined
+
+    - name: "Print VMs"
+      ansible.builtin.debug:
+        var: vm_host_list
+      run_once: true
+
+    - name: "Pause until the previous change is confirmed"
+      ansible.builtin.pause:
+
+    - name: "Print VMs"
+      ansible.builtin.debug:
+        msg:
+        - "{{ 'ocp_bootstrap' in selected_groups }}"
+        - "{{ 'ocp_control_plane' in selected_groups }}"
+        - "{{ 'ocp_compute_node' in selected_groups }}"
+      run_once: true
+
+    - name: "Stop all VM on it's node"
+      ansible.builtin.include_tasks:
+        file: tasks/proxmox_vm_start.yaml
+      vars:
+        vm_name: "{{ item }}"
+        state: "Stopped"
+      loop: "{{ vm_host_list }}"
+      when: ansible_hostname == hostvars[item].pve.owner
+
+    - name: "Set values for the VMs"
+      ansible.builtin.shell: |
+        qm set {{ hostvars[item].pve.vmid }} -ide2 none,media=cdrom
+        qm set {{ hostvars[item].pve.vmid }} -ide0 none,media=cdrom
+        qm set {{ hostvars[item].pve.vmid }} --boot 'order=scsi0;ide2;net0'
+      loop: "{{ vm_host_list }}"
+      when: ansible_hostname == hostvars[item].pve.owner
+
+    # - name: "Start Bootstrap VM on it's node"
+    #   ansible.builtin.include_tasks:
+    #     file: tasks/proxmox_vm_start.yaml
+    #   vars:
+    #     vm_name: "{{ item }}"
+    #     state: "Started"
+    #   loop: "{{ groups['ocp_bootstrap'] }}"
+    #   when: ansible_hostname == hostvars[item].pve.owner and 'ocp_bootstrap' in selected_groups
+      
+    # - name: "Wait for the Bootstrap host port API Server (port 6443) to be available"
+    #   ansible.builtin.wait_for:
+    #     host: "{{ hostvars[item].ansible_host }}"
+    #     port: 6443
+    #     delay: 30
+    #     state: drained
+    #   loop: "{{ groups['ocp_bootstrap'] }}"
+    #   when: ansible_hostname == hostvars[item].pve.owner and 'ocp_bootstrap' in selected_groups
+
+    - name: "Start all VM on their node"
+      ansible.builtin.include_tasks:
+        file: tasks/proxmox_vm_start.yaml
+      vars:
+        vm_name: "{{ item }}"
+        state: "Started"
+      loop: "{{ vm_host_list }}"
+      when: ansible_hostname == hostvars[item].pve.owner
+      
+    # - name: "Start the Control Plane VMs on their nodes"
+    #   ansible.builtin.include_tasks:
+    #     file: tasks/proxmox_vm_start.yaml
+    #   vars:
+    #     vm_name: "{{ item }}"
+    #     state: "Started"
+    #   loop: "{{ groups['ocp_control_plane'] }}"
+    #   when: groups['ocp_control_plane'] is defined and ansible_hostname == hostvars[item].pve.owner
+      
+    # - name: "Start the Compute Node VMs on their nodes"
+    #   ansible.builtin.include_tasks:
+    #     file: tasks/proxmox_vm_start.yaml
+    #   vars:
+    #     vm_name: "{{ item }}"
+    #     state: "Started"
+    #   loop: "{{ groups['ocp_compute_node'] }}"
+    #   when: use_compute_nodes and groups['ocp_compute_node'] is defined and ansible_hostname == hostvars[item].pve.owner
+
+    # - name: "Start all VM on it's node"
+    #   ansible.builtin.include_tasks:
+    #     file: tasks/proxmox_vm_start.yaml
+    #   vars:
+    #     vm_name: "{{ item }}"
+    #     state: "Started"
+    #   loop: "{{ vm_host_list }}"
+    #   when: ansible_hostname == hostvars[item].pve.owner
+...

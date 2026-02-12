@@ -1,0 +1,15 @@
+---
+- name: "Validate required variables"
+  ansible.builtin.assert:
+    that:
+    - "ocp_install_root_dir is defined and ocp_install_root_dir | length > 0"
+
+- name: "Define OCP install root directory"
+  ansible.builtin.set_fact:
+    openshift_install_dir: "{% if ocp_install_root_dir_under_user_home is defined and ocp_install_root_dir_under_user_home %}{{ ansible_env.HOME }}/{% endif %}{{ ocp_install_root_dir }}"
+
+- name: "Define OCP cluster install directory"
+  ansible.builtin.set_fact:
+    openshift_cluster_install_dir: "{{ openshift_install_dir }}/{{ ocp_cluster_name }}"
+
+...

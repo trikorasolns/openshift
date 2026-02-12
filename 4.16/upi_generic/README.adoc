@@ -1,0 +1,391 @@
+= OCP on UPI RHOSP
+Antonio C. <ac (at) trikorasolutions (dot) com>
+:revdate: {docdate}
+:icons: font
+:toc: left
+:toclevels: 3
+:toc-title: Table of Contents
+:description: OCP UPI Installation on Proxmox
+
+== Introduction
+
+[.lead]
+This document describes the installation process for deploying OCP on a UPI 
+ RHOSP platform.
+
+== Prepare
+
+After link:../README.adoc#collect-information[starting the Python venv] log 
+ into OpenStack. This can be done using a `openrc.sh` script.
+
+[NOTE]
+====
+On this example our `openrc.sh` file is located under the `_local_config` 
+ folder that is excluded from git.
+====
+
+[source,bash]
+----
+source ./_local_config/openrc.sh
+----
+
+Check the generic 
+ link:../README.adoc#collect-information[Collect Information] 
+ section.
+
+Set extra variables for OpenStack.
+
+[source,bash]
+----
+OCP_CLUSTER_NAME="ovhcpococp"<1>
+----
+<1> Name of the OCP cluster.
+
+Create a yaml file with the cluster properties. For the sake of the example 
+ this file will be located at 
+ `_local_config/${OCP_CLUSTER_NAME}/${OCP_CLUSTER_NAME}.yaml.`
+
+[source,yaml]
+----
+openstack_network: openshift<1>
+openstack_region: GRA11<2>
+ssh_pub_key_file: ~/.ssh/id_rsa_ovhc_pococp.pub<3>
+----
+<1> Name of the OpenStack region
+<2> Name of the OpenStack network to be used by the cluster.
+<3> Name of the SSH key pair
+
+=== RHOSP Connection
+
+This playbook uses a connection made through a `openrc.sh` file which is 
+ located under the `_local_config` folder. To activate the connection execute 
+ the following command.
+
+[source.bash]
+----
+source ./_local_config/openrc.sh
+----
+
+The RHOSP password will be requested (`Please enter your OpenStack Password:`).
+
+== Install
+
+[.lead]
+Generate OCP Cluster installation folder and download the OCP binaries.
+
+This will generate a directory with name defined on the `ocp_install_root_dir`
+ variable. This directory will be placed under the `ansible_user` home 
+ directory if the `ocp_install_root_dir_under_user_home` variable is true.
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/ansible/02-ocp-services-oi-binaries.yaml \
+  -e @ocp/4.15/ansible/defaults/main.yaml \
+  -e ocp_cluster_name=${OCP_CLUSTER_NAME}
+----
+
+[.lead]
+Generate the _OpenShift Cluster_ installation directory and generate the 
+ Kubernetes manifests and Ignition configuration files for the cluster.
+
+This is done using the `openshift-install` CLI.
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/upi_rhosp/ansible/18-ocp-services-oi-playbook.yaml \
+  -e @ocp/4.15/ansible/defaults/main.yaml \
+  -e @_local_config/network.yaml \
+  -e pull_secret=${RH_CLUSTER_PULL_SECRET} \
+  -e @_local_config/${OCP_CLUSTER_NAME}/${OCP_CLUSTER_NAME}.yaml
+----
+
+Generate the OpenStack infrastructure.
+
+* Import the OpenShift image to OpenStack
+* Create API and Ingress Floating IP Addresses
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/upi_rhosp/ansible/20-rhosp-prepare.yaml \
+  -e @ocp/4.15/ansible/defaults/main.yaml \
+  -e @ocp/4.15/upi_rhosp/ansible/defaults/main.yaml \
+  -e @_local_config/network.yaml \
+  -e @_local_config/${OCP_CLUSTER_NAME}/${OCP_CLUSTER_NAME}.yaml \
+  -e ocp_cluster_name=${OCP_CLUSTER_NAME}
+----
+
+=== Manual steps
+
+==== Load Balancer
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/upi_rhosp/ansible/20.14-rhosp-load-balancer.yaml \
+  -e @ocp/4.15/ansible/defaults/main.yaml \
+  -e @ocp/4.15/upi_rhosp/ansible/defaults/main.yaml \
+  -e @_local_config/network.yaml \
+  -e @_local_config/${OCP_CLUSTER_NAME}/${OCP_CLUSTER_NAME}.yaml \
+  -e ocp_cluster_name=${OCP_CLUSTER_NAME}
+----
+
+==== Fetch DNS information
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/upi_rhosp/ansible/29-rhosp-print-dns-info.yaml   -e @ocp/4.15/ansible/defaults/main.yaml   -e @ocp/4.15/upi_rhosp/ansible/defaults/main.yaml   -e @_local_config/network.yaml   -e @_local_config/${OCP_CLUSTER_NAME}/${OCP_CLUSTER_NAME}.yaml   -e ocp_cluster_name=${OCP_CLUSTER_NAME}
+----
+
+== Cleanup
+
+[.lead]
+Remove infrastructure.
+
+Remove Load Balancer.
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/upi_rhosp/ansible/97-rhosp-lb-cleanup.yaml   -e @ocp/4.15/ansible/defaults/main.yaml   -e @_local_config/network.yaml   -e @_local_config/${OCP_CLUSTER_NAME}/${OCP_CLUSTER_NAME}.yaml   -e ocp_cluster_name=${OCP_CLUSTER_NAME}
+----
+
+Remove instances.
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/upi_rhosp/ansible/98-rhosp-instance-cleanup.yaml \
+  -e @ocp/4.15/ansible/defaults/main.yaml \
+  -e @ocp/4.15/upi_rhosp/ansible/defaults/main.yaml \
+  -e @_local_config/${OCP_CLUSTER_NAME}/${OCP_CLUSTER_NAME}.yaml \
+  -e @_local_config/network.yaml \
+  -e ocp_cluster_name=${OCP_CLUSTER_NAME}
+----
+
+Remove installation.
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/upi_rhosp/ansible/99-ocp-install-cleanup copy.yaml \
+  -e @ocp/4.15/ansible/defaults/main.yaml \
+  -e @_local_config/network.yaml \
+  -e @_local_config/${OCP_CLUSTER_NAME}/${OCP_CLUSTER_NAME}.yaml \
+  -e ocp_cluster_name=${OCP_CLUSTER_NAME}
+----
+
+== Authentication
+
+Get the authentication.
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/ansible/50-ocp-services-get-ocp-auth-playbook.yaml \
+  -e @_local_config/${OCP_CLUSTER_NAME}/${OCP_CLUSTER_NAME}.yaml \
+  -e @ocp/4.15/ansible/defaults/main.yaml
+----
+
+
+=== Add compute nodes
+
+Add a compute node.
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/upi_rhosp/ansible/20.19-rhosp-compute-node-instance.yaml \
+  -e @_local_config/network.yaml \
+  -e @ocp/4.15/ansible/defaults/main.yaml \
+  -e @ocp/4.15/upi_rhosp/ansible/defaults/main.yaml \
+  -e @_local_config/${OCP_CLUSTER_NAME}/${OCP_CLUSTER_NAME}.yaml 
+----
+
+
+=== Storage
+
+[source,bash]
+----
+ =
+----
+
+==== kubernetes/cloud-provider-openstack
+
+===== Cinder
+
+[.lead]
+RHOSP Cinder
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/upi_rhosp/ansible/50-ocp-storage-cinder.yaml \
+  -e @_local_config/network.yaml \
+  -e @ocp/4.15/ansible/defaults/main.yaml \
+  -e @ocp/4.15/upi_rhosp/ansible/defaults/main.yaml \
+  -e @_local_config/${OCP_CLUSTER_NAME}/${OCP_CLUSTER_NAME}.yaml \
+  -e rhosp_os_password="${RHOSP_OS_PASSWORD}"
+----
+
+To test the configuration execute the following configuration that will deploy 
+ an nginx pod with a volume attached to a PVC. The PVC should provision a PV
+ automatically.
+
+[source,bash]
+----
+oc apply -f ocp/4.15/upi_rhosp/ansible/files/kubernetes-cloud-provider-openstack-cinder-test.yaml
+----
+
+Check if the pod is up and running.
+
+[source,bash]
+----
+oc get pod
+----
+
+Should show something like this.
+
+[source,]
+----
+NAME    READY   STATUS    RESTARTS   AGE
+nginx   1/1     Running   0          33s
+----
+
+Check the PV.
+
+[source,bash]
+----
+oc get pv
+----
+
+[source,]
+----
+NAME         CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM                          STORAGECLASS          REASON   AGE
+pvc-xxxxxx   1Gi        RWO            Delete           Bound    default/csi-pvc-cinderplugin   csi-sc-cinderplugin            16h
+----
+
+Check the PVC.
+
+[source,bash]
+----
+oc get pvc
+----
+
+[source,]
+----
+NAME                  STATUS   VOLUME    CAPACITY   ACCESS MODES   STORAGECLASS          AGE
+csi-pvc-cinderplugin  Bound    pvc-xxx   1Gi        RWO            csi-sc-cinderplugin   19h
+----
+
+Check if the volume was created.
+
+[source,bash]
+----
+openstack volume list
+----
+
+[source,]
+====
++------------+------------+----------+------+-------------+
+| ID         | Name       | Status   | Size | Attached to |
++------------+------------+----------+------+-------------+
+| xxx-xxx... | pvc-xxxxxx | reserved |    1 |             |
++------------+------------+----------+------+-------------+
+====
+
+Delete the test resources.
+
+[source,bash]
+----
+oc delete -f ocp/4.15/upi_rhosp/ansible/files/kubernetes-cloud-provider-openstack-cinder-test.yaml
+----
+
+
+===== Manila
+
+[.lead]
+RHOSP Manila
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/upi_rhosp/ansible/95-ocp-storage-manila-cleanup.yaml \
+  -e @_local_config/network.yaml \
+  -e @ocp/4.15/ansible/defaults/main.yaml \
+  -e @ocp/4.15/upi_rhosp/ansible/defaults/main.yaml \
+  -e @_local_config/${OCP_CLUSTER_NAME}/${OCP_CLUSTER_NAME}.yaml
+----
+
+To test the configuration execute the following configuration that will deploy 
+ an nginx pod with a volume attached to a PVC. The PVC should provision a PV
+ automatically.
+
+[source,bash]
+----
+oc apply -f ocp/4.15/upi_rhosp/ansible/files/kubernetes-cloud-provider-openstack-manila-test.yaml
+----
+
+Delete manila test.
+
+[source,bash]
+----
+oc delete -f ocp/4.15/upi_rhosp/ansible/files/kubernetes-cloud-provider-openstack-manila-test.yaml
+----
+
+Delete manila configuration.
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/upi_rhosp/ansible/95-ocp-storage-manila-cleanup.yaml \
+  -e @_local_config/network.yaml \
+  -e @ocp/4.15/ansible/defaults/main.yaml \
+  -e @ocp/4.15/upi_rhosp/ansible/defaults/main.yaml \
+  -e @_local_config/${OCP_CLUSTER_NAME}/${OCP_CLUSTER_NAME}.yaml
+----
+
+References: 
+
+* https://github.com/kubernetes/cloud-provider-openstack
+* Cinder: https://github.com/kubernetes/cloud-provider-openstack/blob/master/docs/cinder-csi-plugin/using-cinder-csi-plugin.md
+* Manila: https://github.com/kubernetes/cloud-provider-openstack/blob/master/docs/manila-csi-plugin/using-manila-csi-plugin.md
+
+==== openshift
+
+* Manila: https://github.com/openshift/csi-driver-manila-operator
+* Cinder: https://github.com/openshift/openstack-cinder-csi-driver-operator
+* https://github.com/openshift/csi-operator/
+
+
+*Cluster Storage Operator*
+
+* https://docs.redhat.com/en/documentation/openshift_container_platform/4.15/html/operators/cluster-operators-ref#cluster-storage-operator_cluster-operators-ref
+* https://github.com/openshift/cluster-storage-operator/tree/release-4.15
+
+== Maintenance
+
+*Stop node*
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/upi_rhosp/ansible/node-stop.yaml \
+  -e nodename=node-name \
+  -e rhosp_instance_name=rhosp-instance
+----
+
+*Start node*
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/upi_rhosp/ansible/node-start.yaml \
+  -e nodename=node-name \
+  -e rhosp_instance_name=rhosp-instance
+----
+
+*Restart node*
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/upi_rhosp/ansible/node-restart.yaml \
+  -e nodename=node-name \
+  -e rhosp_instance_name=rhosp-instance
+----
+
+== References
+
+* https://docs.redhat.com/en/documentation/openshift_container_platform/4.11/html/installing/installing-on-openstack
+* https://docs.redhat.com/en/documentation/openshift_container_platform/4.11/html/installing/installing-on-openstack#cluster-entitlements_installing-openstack-user
+* https://github.com/openshift/installer/tree/release-4.15/upi/openstack
+* https://docs.fedoraproject.org/en-US/fedora-coreos/provisioning-openstack/
+* https://github.com/openshift/installer/blob/main/docs/user/openstack/install_upi.md

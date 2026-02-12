@@ -1,0 +1,69 @@
+---
+- name: "Init the OCP Services host for Ansible"
+  hosts: "localhost"
+  gather_facts: true
+
+  tasks:
+  - name: "Change managementState Image Registry Operator configuration from Removed to Managed"
+    ansible.builtin.shell: |
+      oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed"}}'
+    register: shell_res
+    changed_when: shell_res.rc == 0 and 'no change' not in shell_res.stdout
+
+  - name: "Print shell result if changes were made"
+    ansible.builtin.debug:
+      var: shell_res
+    when: shell_res.changed
+
+  - name: "Change managementState Image Registry Operator configuration from Removed to Managed"
+    ansible.builtin.shell: |
+      oc get pod -n openshift-image-registry -l docker-registry=default
+    register: registry_list_res
+    changed_when: false
+
+  - name: "Debug"
+    ansible.builtin.debug:
+      var: registry_list_res
+
+  - name: "Check the registry configuration:"
+    ansible.builtin.debug:
+      msg:
+      - "execute: oc edit configs.imageregistry.operator.openshift.io"
+      - "Check the following structure exists:"
+      - "storage:"
+      - "  pvc:"
+      - "    claim:"
+
+  - name: "Pause until the previous change is confirmed"
+    ansible.builtin.pause:
+
+  - name: "Check the clusteroperator status:"
+    ansible.builtin.shell: |
+      oc get clusteroperator image-registry
+    register: clusteroperator_status_res
+
+  - name: "Debug"
+    ansible.builtin.debug:
+      var: clusteroperator_status_res
+
+
+  - name: "Create the object bucket claim"
+    ansible.builtin.shell: |
+      oc apply -f files/ocs-storagecluster-ceph-rgw.yaml
+    register: create_object_bucket_claim_res
+
+  - name: "Debug"
+    ansible.builtin.debug:
+      var: create_object_bucket_claim_res
+
+  - name: "Get the bucket name"
+    ansible.builtin.shell: |
+      oc get obc -n openshift-storage rgwbucket -o jsonpath='{.spec.bucketName}'
+    register: bucket_name_res
+
+  - name: "Create the secret image-registry-private-configuration-user with the Ceph credentials for the new bucket under openshift-image-registry project"
+    ansible.builtin.shell: |
+      oc create secret generic image-registry-private-configuration-user --from-literal=REGISTRY_STORAGE_S3_ACCESSKEY={{ ceph_admin_id }} --from-literal=REGISTRY_STORAGE_S3_SECRETKEY={{ ceph_admin_key }} --namespace openshift-image-registry
+    register: bucket_name_res
+    
+...

@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-rook-cephblock-test
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: rook-ceph-block
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-rook-cephblock-test
+spec:
+  containers:
+  - image: nginx
+    imagePullPolicy: IfNotPresent
+    name: nginx
+    ports:
+    - containerPort: 80
+      protocol: TCP
+    volumeMounts:
+      - mountPath: /var/lib/www/html
+        name: www
+  volumes:
+  - name: www
+    persistentVolumeClaim:
+      claimName: pvc-rook-cephblock-test
+      readOnly: false
+---

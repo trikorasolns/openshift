@@ -1,0 +1,123 @@
+---
+- name: "Collect information"
+  import_playbook: _common_rhosp.yaml
+  when: ocp_cluster_id_tag is not defined
+
+- name: "Deploy Control Plane Instance"
+  hosts: "localhost"
+  gather_facts: true
+
+  tasks:
+
+  - name: "Check if the Control Plane servers exists"
+    openstack.cloud.server_info:
+      name: "{{ rhosp_control_plane_server_prefix }}"
+    register: rhosp_controlplane_server_info
+
+  - name: "Print Control Plane server info"
+    ansible.builtin.debug:
+      var: rhosp_controlplane_server_info
+      verbosity: 2
+
+  - name: 'Create the Control Plane servers'
+    openstack.cloud.server:
+      name: "{{ rhosp_control_plane_server_prefix }}-{{ item }}"
+      image: "{{ rhosp_rhcoreos_image_name }}"
+      flavor: "{{ rhosp_flavor_master }}"
+      userdata: "{{ lookup('file', '/tmp/master-' + metadata_json.infraID + '.ign') | string }}"
+      network: "{{ rhosp_network }}"
+      auto_floating_ip: false
+      # nics:
+      # - port-name: "{{ os_port_controlplane }}"
+      meta: "{{ ocp_cluster_id_tag }}"
+      # wait: false # due to TypeError: 'NoneType' object is not subscriptable
+      security_groups:
+      - default
+    when: rhosp_controlplane_server_info.servers | length < 3
+    loop: "{{ range(rhosp_controlplane_server_info.servers | length +1 ,4) }}"
+
+  # - name: "Add members to the public load-balancer pool"
+  #   openstack.cloud.lb_member:
+  #     name: "{{ rhosp_control_plane_server_prefix }}-{{ item }}"
+  #     pool: "{{ rhosp_loadbalancer_pool_name }}-public"
+  #     state: present
+  #   loop: "{{ range(1,4) }}"
+
+  # - name: "Add members to the private load-balancer pool"
+  #   openstack.cloud.lb_member:
+  #     name: "{{ rhosp_control_plane_server_prefix }}-{{ item }}"
+  #     pool: "{{ rhosp_loadbalancer_pool_name }}-internal"
+  #     state: present
+  #   loop: "{{ range(1,4) }}"
+
+  - name: "Fetch server info"
+    openstack.cloud.server_info:
+      name: "{{ rhosp_control_plane_server_prefix }}"
+    register: rhosp_controlplane_server_info
+
+  # - name: 'Create the Control Plane ports'
+  #   openstack.cloud.port:
+  #     name: "{{ item.1 }}-{{ item.0 }}"
+  #     network: "{{ os_network }}"
+  #     security_groups:
+  #     - "{{ os_sg_master }}"
+  #     allowed_address_pairs:
+  #     - ip_address: "{{ os_apiVIP }}"
+  #     - ip_address: "{{ os_ingressVIP }}"
+  #   with_indexed_items: "{{ [os_port_master] * os_cp_nodes_number }}"
+  #   register: ports
+  #   # when: os_subnet6_range is not defined
+
+  # - name: 'Create the dualstack Control Plane ports'
+  #   openstack.cloud.port:
+  #     name: "{{ item.1 }}-{{ item.0 }}"
+  #     network: "{{ os_network }}"
+  #     security_groups:
+  #     - "{{ os_sg_master }}"
+  #     allowed_address_pairs:
+  #     - ip_address: "{{ os_apiVIP }}"
+  #     - ip_address: "{{ os_apiVIP6 }}"
+  #     - ip_address: "{{ os_ingressVIP }}"
+  #     - ip_address: "{{ os_ingressVIP6 }}"
+  #   with_indexed_items: "{{ [os_port_master] * os_cp_nodes_number }}"
+  #   register: ports
+  #   when: os_subnet6_range is defined
+
+  # - name: 'Set Control Plane ports tag'
+  #   ansible.builtin.command:
+  #     cmd: "openstack port set --tag {{ cluster_id_tag }} {{ item.1 }}-{{ item.0 }}"
+  #   with_indexed_items: "{{ [os_port_master] * os_cp_nodes_number }}"
+
+  # - name: 'List the Server groups'
+  #   ansible.builtin.command:
+  #     # os-compute-api-version 2.15 oansible-playbook ocp/4.15/upi_rhosp/ansible/20.15-rhosp-load-balancer-members.yaml \
+  #     # os-compute-api-version 2.15 or higher is required for the 'soft-anti-affinity' policy
+  #     openstack --os-compute-api-version=2.15 server group create -f json -c id --policy=soft-anti-affinity {{ os_cp_server_group_name }}
+  #   register: server_group_created
+  #   when:
+  #   - server_group_id is not defined
+
+  # - name: 'Parse the Server group ID from creation'
+  #   ansible.builtin.set_fact:
+  #     server_group_id: "{{ (server_group_created.stdout | from_json).id }}"
+  #   when:
+  #   - server_group_id is not defined
+
+  # - name: 'Create the Control Plane servers'
+  #   openstack.cloud.server:
+  #     name: "{{ item.1 }}-{{ item.0 }}"
+  #     image: "{{ os_image_rhcos }}"
+  #     flavor: "{{ rhosp_flavor_master }}"
+  #     auto_ip: no
+  #     # The ignition filename will be concatenated with the Control Plane node
+  #     # name and its 0-indexed serial number.
+  #     # In this case, the first node will look for this filename:
+  #     #    "{{ infraID }}-master-0-ignition.json"
+  #     userdata: "{{ lookup('file', [item.1, item.0, 'ignition.json'] | join('-')) | string }}"
+  #     nics:
+  #     - port-name: "{{ os_port_master }}-{{ item.0 }}"
+  #     scheduler_hints:
+  #       group: "{{ server_group_id }}"
+  #     meta: "{{ ocp_cluster_id_tag }}"
+  #   with_indexed_items: "{{ [os_cp_server_name] * os_cp_nodes_number }}"
+...

@@ -1,0 +1,18 @@
+apiVersion: core.openstack.org/v1beta1
+kind: OpenStackControlPlane
+metadata:
+  name: openstack-control-plane
+  namespace: openstack
+spec:
+  swift:
+    enabled: true
+    template:
+      swiftProxy:
+        replicas: 2
+      swiftRing:
+        ringReplicas: 3
+      swiftStorage:
+        replicas: 3
+        storageClass: swift-storage
+        storageRequest: 100Gi
+...

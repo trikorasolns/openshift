@@ -1,0 +1,157 @@
+---
+- name: "Read installation info from openshift installation"
+  hosts: "ocp_services"
+  gather_facts: true
+
+  pre_tasks:
+  - name: "Define variables"
+    ansible.builtin.include_tasks:
+      file: tasks/set_ocp_install_dir.yaml
+
+  tasks:
+    - name: "Obtain the correct version of your RHCOS images"
+      ansible.builtin.shell: |
+          ./openshift-install coreos print-stream-json
+      register: coreos_stream_res
+      args:
+        chdir: "{{ openshift_install_dir }}"
+
+    - name: "RHCOS output"
+      ansible.builtin.debug:
+        var: coreos_stream_res.stdout
+        verbosity: 2
+
+    - name: "Set fact for coreos information"
+      ansible.builtin.set_fact:
+        coreos_stream_json: "{{ coreos_stream_res.stdout | from_json  }}"
+
+    - name: "Set fact for the image location"
+      ansible.builtin.set_fact:
+        coreos_image_location: "{{ coreos_stream_json.architectures.x86_64.artifacts.metal.formats.iso.disk.location  }}"
+
+    - name: "RHCOS image to use"
+      ansible.builtin.debug:
+        msg: 
+        - "CoreOS ISO disk location: {{ coreos_image_location }}"
+
+    - name: "Read bootstrap Ignition file signature"
+      ansible.builtin.slurp:
+        src: "{{ openshift_cluster_install_dir }}/bootstrap.ign.sig"
+      register: bootstrap_sig_slurp
+
+    - name: "Read master Ignition file signature"
+      ansible.builtin.slurp:
+        src: "{{ openshift_cluster_install_dir }}/master.ign.sig"
+      register: master_sig_slurp
+
+    - name: "Read worker Ignition file signature"
+      ansible.builtin.slurp:
+        src: "{{ openshift_cluster_install_dir }}/worker.ign.sig"
+      register: worker_sig_slurp
+
+  post_tasks:
+
+    - name: "Set CoreOS Image Location under localhost"
+      ansible.builtin.set_fact:
+        global_coreos_image_location: "{{ coreos_image_location }}"
+      delegate_to: localhost
+      delegate_facts: True
+
+    - name: "Set CoreOS Image Location under localhost"
+      ansible.builtin.set_fact:
+        global_bootstrap_hash: "{{ bootstrap_sig_slurp.content | b64decode }}"
+        global_master_hash: "{{ master_sig_slurp.content | b64decode }}"
+        global_worker_hash: "{{ worker_sig_slurp.content | b64decode }}"
+      delegate_to: localhost
+      delegate_facts: True
+
+- name: "Setup Proxmox VMs"
+  hosts: "proxmox_nodes"
+  gather_facts: true
+
+  pre_tasks:
+  - name: "Fetch Glocal variables"
+    ansible.builtin.set_fact:
+      coreos_image_location: "{{ hostvars['localhost']['global_coreos_image_location'] }}"
+      coreos_image_filename: "{{ hostvars['localhost']['global_coreos_image_location'] | basename}}"
+      bootstrap_hash: "{{ hostvars['localhost']['global_bootstrap_hash'] }}"
+      master_hash: "{{ hostvars['localhost']['global_master_hash']}}"
+      worker_hash: "{{ hostvars['localhost']['global_worker_hash'] }}"
+    delegate_to: localhost
+
+  - name: "RHCOS image to use"
+    ansible.builtin.debug:
+      msg: 
+      - "CoreOS ISO disk location (coreos_image_location): {{ coreos_image_location }}"
+      - "CoreOS ISO disk file name: {{ coreos_image_filename }}"
+
+  - name: "Affected groups"
+    ansible.builtin.set_fact:
+      selected_groups: ['ocp_bootstrap','ocp_control_plane']
+    when: selected_groups is undefined or selected_groups | length == 0
+
+  tasks:
+    # - name: "Build VM list"
+    #   ansible.builtin.set_fact:
+    #     # vm_host_list: "{{ (groups['ocp_bootstrap'] | default([])) + (groups['ocp_control_plane'] | default([])) + (groups['ocp_compute_node'] | default([])) }}"
+    #     vm_host_list: "{{ (groups['ocp_bootstrap'] | default([])) + (groups['ocp_control_plane'] | default([])) }}"
+
+    - name: "Build VM list"
+      ansible.builtin.set_fact:
+        vm_host_list: "{{ (vm_host_list | default([]) ) + (groups[item] | default([])) }}"
+      loop: "{{ selected_groups }}"
+      when: vm_host_list is undefined
+
+    - name: "Print VMs"
+      ansible.builtin.debug:
+        var: vm_host_list
+      run_once: true
+
+    - name: "Pause until the previous change is confirmed"
+      ansible.builtin.pause:
+
+    - name: "Download the ISO"
+      ansible.builtin.shell: |
+        curl -O {{ coreos_image_location }}
+      args:
+        chdir: "/var/lib/vz/template/iso"
+      when: skip_download is undefined or not (skip_download | bool)
+
+    - name: "Generate VM Ignition ISO"
+      ansible.builtin.include_tasks:
+        file: tasks/proxmox_ignition_iso.yaml
+      vars:
+        role: "{{ item }}"
+      loop:
+      - { name: "bootstrap", hash: "{{ bootstrap_hash }}" }
+      - { name: "master", hash: "{{ master_hash }}" }
+      - { name: "worker", hash: "{{ worker_hash }}" }
+
+    - name: "Stop all VM on it's node"
+      ansible.builtin.include_tasks:
+        file: tasks/proxmox_vm_start.yaml
+      vars:
+        vm_name: "{{ item }}"
+        state: "Stopped"
+      loop: "{{ vm_host_list }}"
+      when: ansible_hostname == hostvars[item].pve.owner
+
+    - name: "Set CDRom for the VMs"
+      ansible.builtin.shell: |
+        qm set {{ hostvars[item].pve.vmid }} -ide2 local:iso/{{ coreos_image_filename }},media=cdrom
+        qm set {{ hostvars[item].pve.vmid }} -ide0 local:iso/ignition-{{ hostvars[item].ocp_role }}.iso,media=cdrom
+        qm set {{ hostvars[item].pve.vmid }} --boot 'order=ide2;scsi0;net0'
+        #qm set {{ hostvars[item].pve.vmid }} -serial0 socket
+      loop: "{{ vm_host_list }}"
+      when: ansible_hostname == hostvars[item].pve.owner
+
+    - name: "Start all VM on it's node"
+      ansible.builtin.include_tasks:
+        file: tasks/proxmox_vm_start.yaml
+      vars:
+        vm_name: "{{ item }}"
+        state: "Started"
+      loop: "{{ vm_host_list }}"
+      when: ansible_hostname == hostvars[item].pve.owner
+
+...

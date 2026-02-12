@@ -1,0 +1,86 @@
+= Opeshift Data Foundation
+Antonio C. <ac (at) trikorasolutions (dot) com>
+:revdate: {docdate}
+:icons: font
+:toc: left
+:toclevels: 3
+:toc-title: Table of Contents
+:description: OCP UPI Installation on Proxmox
+
+== Introduction
+
+[.lead]
+This document is WIP and describes the deployment of the OpenShift Data 
+ Foundation operator and a Ceph storage.
+
+== Deploying OpenShift Data Foundation in external mode
+
+References:
+
+* https://docs.redhat.com/en/documentation/red_hat_openshift_data_foundation/4.15/html-single/deploying_openshift_data_foundation_in_external_mode/index#creating-an-openshift-data-foundation-cluster-service-for-external-storage_ceph-external
+
+=== Prepare Ceph server
+
+Enable the _Prometheus_ module on Ceph.
+
+[source,bash]
+----
+ceph mgr module enable prometheus
+----
+
+Collect the data pool information.
+
+[source,bash]
+----
+python3 ceph-external-cluster-details-exporter.py --rbd-data-pool-name <rbd_data_pool_name>  --cephfs-metadata-pool-name <cephfs_metadata_pool_name> --cephfs-data-pool-name <cephfs_data_pool_name>  --cephfs-filesystem-name <cephfs_fs_name>  > ceph_rbd_cephfs.json
+----
+
+
+=== Install ODF
+
+=== Manually
+
+Access the OpenShift Console and open the _Administrator_ view.
+
+Open the _Operators > OperatorHub_ and search for _OpenShift Data Foundation_.
+ Select the `stable-4.15` Channel and `4.15.12-rhod` version and press _Install_.
+
+On the _Install Operator_ screen leave the default options and press _Install_.
+
+Once finished a warning that a _Web console update is available_. Refresh the _Web Console_.
+
+Go to _Operator > Installed Operators_ and check the status of the _ODF_ 
+ operator is _Succeeded_.
+
+Go to _Storage > Data Foundation_.
+
+=== Automated
+
+TBD
+
+* https://github.com/red-hat-storage/odf-operator
+
+
+== Configuring the registry for bare metal
+
+References:
+
+* https://docs.openshift.com/container-platform/4.15/registry/configuring_registry_storage/configuring-registry-storage-baremetal.html
+* https://docs.openshift.com/container-platform/4.15/registry/configuring_registry_storage/configuring-registry-storage-rhodf.html
+
+[source,bash]
+----
+ansible-playbook ocp/storage/odf/ansible/configure-registry-odf-playbook.yaml \
+  -e @ocp/storage/odf/ansible/defaults/main.yaml \
+  -e ceph_admin_key=${CEPH_ADM_KEY}
+----
+
+== References
+
+* https://docs.redhat.com/en/documentation/red_hat_openshift_data_foundation/4.15/html-single/deploying_openshift_data_foundation_in_external_mode/index#network_ports_required_between_openshift_container_platform_and_ceph_when_using_external_mode_deployment
+* https://docs.redhat.com/en/documentation/red_hat_openshift_data_foundation/4.15/html/red_hat_openshift_data_foundation_architecture/openshift_data_foundation_operators
+
+== Troubleshooting
+
+*A NooBaa bucket first.bucket is in error state for more than...*:: 
+https://access.redhat.com/solutions/7053582

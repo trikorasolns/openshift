@@ -1,0 +1,290 @@
+= OCP on UPI RHOSP
+Antonio C. <ac (at) trikorasolutions (dot) com>
+:revdate: {docdate}
+:icons: font
+:toc: left
+:toclevels: 3
+:toc-title: Table of Contents
+:description: OCP UPI Installation on RedHat OpenStack Platform
+
+== Introduction
+
+[.lead]
+This document describes the installation process for deploying OCP on a UPI 
+ RHOSP platform.
+
+== Prepare
+
+After link:../README.adoc#collect-information[starting the Python venv] log 
+ into OpenStack. This can be done using a `openrc.sh` script.
+
+[NOTE]
+====
+On this example our `openrc.sh` file is located under the `_local_config` 
+ folder that is excluded from git.
+====
+
+Check the generic 
+ link:../README.adoc#collect-information[Collect Information] 
+ section.
+
+Set extra variables for OpenStack.
+
+[source,bash]
+----
+OCP_CLUSTER_NAME="ovhcpococp"<1>
+----
+<1> Name of the OCP cluster.
+
+Create a yaml file with the cluster properties. For the sake of the example 
+ this file will be located at 
+ `_local_config/${OCP_CLUSTER_NAME}/${OCP_CLUSTER_NAME}.yaml.`
+
+[source,yaml]
+----
+openstack_network: openshift<1>
+openstack_region: GRA11<2>
+ssh_pub_key_file: ~/.ssh/id_rsa_ovhc_pococp.pub<3>
+----
+<1> Name of the OpenStack region
+<2> Name of the OpenStack network to be used by the cluster.
+<3> Name of the SSH key pair
+
+=== RHOSP Connection
+
+This playbook uses a connection made through a `openrc.sh` file which is 
+ located under the `_local_config` folder. To activate the connection execute 
+ the following command.
+
+[source,bash]
+----
+source ./_local_config/openrc.sh
+----
+
+The RHOSP password will be requested (`Please enter your OpenStack Password:`).
+
+== Install
+
+[.lead]
+Generate OCP Cluster installation folder and download the OCP binaries.
+
+This will generate a directory with name defined on the `ocp_install_root_dir`
+ variable. This directory will be placed under the `ansible_user` home 
+ directory if the `ocp_install_root_dir_under_user_home` variable is true.
+
+[source,bash]
+----
+ ansible-playbook ocp/upi/ansible/02-ocp-services-oi-binaries.yaml \
+-e @ocp/upi/ansible/defaults/main.yaml \
+-e @ocp/4.16/ansible/defaults/main.yaml \
+-e @_local_config/${OCP_CLUSTER_NAME}/${OCP_CLUSTER_NAME}.yaml 
+----
+
+[.lead]
+Generate the _OpenShift Cluster_ installation directory and generate the 
+ Kubernetes manifests and Ignition configuration files for the cluster.
+
+This is done using the `openshift-install` CLI.
+
+[source,bash]
+----
+ ansible-playbook ocp/upi/ansible/upi_rhosp/18-ocp-services-oi-playbook.yaml \
+-e @ocp/aupi/nsible/defaults/main.yaml \
+-e @ocp/4.16/ansible/defaults/main.yaml \
+-e @_local_config/network.yaml \
+-e pull_secret=${RH_CLUSTER_PULL_SECRET} \
+-e @_local_config/${OCP_CLUSTER_NAME}/${OCP_CLUSTER_NAME}.yaml
+----
+
+Generate the OpenStack infrastructure.
+
+* Import the OpenShift image to OpenStack
+* Create API and Ingress Floating IP Addresses
+
+=== Deploy the backbone Network infrastructure
+
+[.lead]
+Deploy the RHOSP network infrastructure that will support the OpenShift cluster. 
+
+[source,bash]
+----
+ansible-playbook ocp/upi/ansible/upi_rhosp/20-rhosp-prepare.yaml \
+-e @ocp/upi/ansible/defaults/main.yaml \
+-e @ocp/4.16/ansible/defaults/main.yaml \
+-e @ocp/upi/upi_rhosp/ansible/defaults/main.yaml \
+-e @ocp/upi/upi_rhosp/ansible/defaults/ovhcloud.yaml \
+-e @_local_config/network.yaml \
+-e @_local_config/${OCP_CLUSTER_NAME}/${OCP_CLUSTER_NAME}.yaml 
+----
+
+=== Deploy the Bootstrap node
+
+[.lead]
+This OCP cluster deployment will be boostraped by a temporary node, the bootstrap node. 
+
+[source,bash]
+----
+ansible-playbook ocp/upi/upi_rhosp/ansible/21-rhosp-deploy-ocp-bootstrap.yaml \
+-e @ocp/ansible/defaults/main.yaml \
+-e @ocp/4.16/ansible/defaults/main.yaml \
+-e @ocp/upi/upi_rhosp/ansible/defaults/main.yaml \
+-e @ocp/upi/upi_rhosp/ansible/defaults/ovhcloud.yaml \
+-e @_local_config/network.yaml \
+-e @_local_config/${OCP_CLUSTER_NAME}/${OCP_CLUSTER_NAME}.yaml 
+----
+
+===  Deploy Control Plane nodes 
+
+[source,bash]
+----
+ansible-playbook ocp/upi/upi_rhosp/ansible/22-rhosp-deploy-ocp-cp.yaml \
+  -e @ocp/ansible/defaults/main.yaml \
+  -e @ocp/4.16/ansible/defaults/main.yaml \
+  -e @ocp/upi/upi_rhosp/ansible/defaults/main.yaml \
+  -e @ocp/upi/upi_rhosp/ansible/defaults/ovhcloud.yaml \
+  -e @_local_config/network.yaml \
+  -e @_local_config/${OCP_CLUSTER_NAME}/${OCP_CLUSTER_NAME}.yaml 
+----
+
+=== Deploy Compute Nodes
+
+[.lead]
+Add the compute nodes.
+
+[source,bash]
+----
+ansible-playbook ocp/upi/upi_rhosp/ansible/35-rhosp-compute-node-instance.yaml \
+  -e @ocp/upi/ansible/defaults/main.yaml \
+  -e @ocp/4.16/ansible/defaults/main.yaml \
+  -e @ocp/upi/upi_rhosp/ansible/defaults/main.yaml \
+  -e @ocp/upi/upi_rhosp/ansible/defaults/ovhcloud.yaml \
+  -e @_local_config/network.yaml \
+  -e @_local_config/${OCP_CLUSTER_NAME}/${OCP_CLUSTER_NAME}.yaml \
+  -i _local_config/ansible/inventory.yaml
+----
+
+[.lead]
+Approve the pending CSR.
+
+List the existing CSR.
+
+[source,bash]
+----
+oc get csr
+----
+
+And approve the ones that are pending.
+
+[source,bash]
+----
+oc adm certificate approve csr-qgksf
+----
+
+To approve massively all pending CSR check link:https://access.redhat.com/solutions/7051207[this RedHat article].
+
+[WARNING]
+====
+Throughout the worker node configuration process new CSR will have to be approved.
+====
+
+=== Remove worker from Control Plane nodes
+
+[.lead]
+Once the compute nodes are deployes the worker label can be removed from the original
+ control plane nodes.
+
+[source,bash]
+----
+oc patch scheduler cluster --type merge -p '{"spec":{"mastersSchedulable":false}}'
+----
+
+
+== Cleanup
+
+[.lead]
+Remove infrastructure.
+
+Remove Load Balancer.
+
+[source,bash]
+----
+ansible-playbook ocp/4.16/upi_rhosp/ansible/97-rhosp-lb-cleanup.yaml   -e @ocp/4.16/ansible/defaults/main.yaml   -e @_local_config/network.yaml   -e @_local_config/${OCP_CLUSTER_NAME}/${OCP_CLUSTER_NAME}.yaml   -e ocp_cluster_name=${OCP_CLUSTER_NAME}
+----
+
+Remove instances.
+
+[source,bash]
+----
+ansible-playbook ocp/4.16/upi_rhosp/ansible/98-rhosp-instance-cleanup.yaml \
+  -e @ocp/4.16/ansible/defaults/main.yaml \
+  -e @ocp/4.16/upi_rhosp/ansible/defaults/main.yaml \
+  -e @_local_config/${OCP_CLUSTER_NAME}/${OCP_CLUSTER_NAME}.yaml \
+  -e @_local_config/network.yaml \
+  -e ocp_cluster_name=${OCP_CLUSTER_NAME}
+----
+
+Remove installation.
+
+[source,bash]
+----
+ansible-playbook ocp/4.16/upi_rhosp/ansible/99-ocp-install-cleanup copy.yaml \
+  -e @ocp/4.16/ansible/defaults/main.yaml \
+  -e @_local_config/network.yaml \
+  -e @_local_config/${OCP_CLUSTER_NAME}/${OCP_CLUSTER_NAME}.yaml \
+  -e ocp_cluster_name=${OCP_CLUSTER_NAME}
+----
+
+== Authentication
+
+Get the authentication.
+
+[source,bash]
+----
+ansible-playbook ocp/4.16/ansible/50-ocp-services-get-ocp-auth-playbook.yaml \
+  -e @_local_config/${OCP_CLUSTER_NAME}/${OCP_CLUSTER_NAME}.yaml \
+  -e @ocp/4.16/ansible/defaults/main.yaml
+----
+
+
+
+== Storage
+
+For storage documentation check the link:storage.adoc[] document.
+
+
+== Maintenance
+
+*Stop node*
+
+[source,bash]
+----
+ansible-playbook ocp/4.16/upi_rhosp/ansible/node-stop.yaml \
+  -e nodename=node-name \
+  -e rhosp_instance_name=rhosp-instance
+----
+
+*Start node*
+
+[source,bash]
+----
+ansible-playbook ocp/4.16/upi_rhosp/ansible/node-start.yaml \
+  -e nodename=node-name \
+  -e rhosp_instance_name=rhosp-instance
+----
+
+*Restart node*
+
+[source,bash]
+----
+ansible-playbook ocp/4.16/upi_rhosp/ansible/node-restart.yaml \
+  -e nodename=node-name \
+  -e rhosp_instance_name=rhosp-instance
+----
+
+== References
+
+* https://docs.redhat.com/en/documentation/openshift_container_platform/4.11/html/installing/installing-on-openstack
+* https://docs.redhat.com/en/documentation/openshift_container_platform/4.11/html/installing/installing-on-openstack#cluster-entitlements_installing-openstack-user
+* https://github.com/openshift/installer/tree/release-4.16/upi/openstack
+* https://docs.fedoraproject.org/en-US/fedora-coreos/provisioning-openstack/
+* https://github.com/openshift/installer/blob/main/docs/user/openstack/install_upi.md

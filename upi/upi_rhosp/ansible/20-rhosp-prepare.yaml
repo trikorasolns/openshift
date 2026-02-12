@@ -1,0 +1,95 @@
+---
+- name: "Collect information"
+  import_playbook: _common_rhosp.yaml
+
+- name: "Check required variables"
+  hosts: "localhost"
+  gather_facts: true
+
+  tasks:
+  - name: "Check required variables"
+    ansible.builtin.assert:
+      that:
+        - ocp_cluster_name is defined and (ocp_cluster_name | length > 0)
+      fail_msg:
+        - "The name of the OCP cluster must be defined in the 'ocp_cluster_name' variable."
+
+- name: "Setup OpenStack Environment"
+  hosts: "localhost"
+  gather_facts: true
+
+  pre_tasks:
+
+  - name: "RHCOS image to use"
+    ansible.builtin.debug:
+      msg: 
+      - "CoreOS ISO disk location (coreos_image_location): {{ coreos_image_location }}"
+      - "CoreOS compressed ISO disk file name: {{ coreos_image_filename }}"
+      - "CoreOS ISO disk file name: {{ coreos_image_filename | splitext | first }}"
+
+  tasks:
+
+  - name: "Check if cluster image exists"
+    openstack.cloud.image_info:
+      image: "{{ rhosp_rhcoreos_image_name }}"
+      # region_name: "{{ openstack_region }}"
+    register: openstack_image_coreos_res
+
+  - name: "RHCOS output"
+    ansible.builtin.debug:
+      msg: 
+      - "openstack_image_coreos_res: {{ openstack_image_coreos_res }}"
+      - "openstack_image_coreos_res.images: {{ openstack_image_coreos_res.images }}"
+      - "openstack_image_coreos_res.images: {{ openstack_image_coreos_res.images | length == 0 }}"
+
+  - name: "Check if need to upload image"
+    ansible.builtin.set_fact:
+      need_to_upload_rhcos_image_to_rhosp: "{{ openstack_image_coreos_res.failed or (openstack_image_coreos_res.images | length == 0) or (openstack_image_force_upload is defined and openstack_image_force_upload | bool) }}"
+
+  - name: "Download the RHCOS image"
+    ansible.builtin.get_url:
+      url: "{{ coreos_image_location }}"
+      dest: "{{ openshift_install_dir }}/{{ coreos_image_filename }}"
+    when: need_to_upload_rhcos_image_to_rhosp
+  - name: "Extract RHCOS image archive" 
+    # ansible.builtin.unarchive:
+    #   src: "{{ openshift_install_dir }}/{{ coreos_image_filename }}"
+    #   dest: "{{ openshift_install_dir }}/"
+    ansible.builtin.shell: |
+      gzip -d -f {{ openshift_install_dir }}/{{ coreos_image_filename }}
+    args:
+      chdir: "{{ openshift_install_dir }}"
+    when: need_to_upload_rhcos_image_to_rhosp
+      
+  - name: "Upload RHCOS image"
+    openstack.cloud.image:
+      name: "{{ rhosp_rhcoreos_image_name }}"
+      # image: "{{ rhosp_rhcoreos_image_name }}"
+      container_format: bare
+      disk_format: qcow2
+      state: present
+      # filename: "{{ coreos_image_location }}"
+      filename: "{{ openshift_install_dir }}/{{ coreos_image_filename | splitext | first }}"
+      # kernel: cirros-vmlinuz
+      # ramdisk: cirros-initrd
+      tags:
+        - rhcos
+        - "{{ ocp_cluster_name }}"
+        - openshift
+      properties:
+        cpu_arch: x86_64
+        distro: rhcos
+    register: openstack_image_coreos_upload_res
+    when: need_to_upload_rhcos_image_to_rhosp
+
+- name: "Setup OpenStack Network"
+  import_playbook: 20.3-rhosp-prepare-network.yaml
+
+
+- name: "Deploy Load Balancer"
+  import_playbook: 20.4-rhosp-load-balancer-deploy.yaml
+
+- name: "Show required DNS records"
+  import_playbook: 20.9-rhosp-print-lb-dns-info.yaml
+
+...

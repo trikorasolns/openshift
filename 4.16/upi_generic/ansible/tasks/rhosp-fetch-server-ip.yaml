@@ -1,0 +1,10 @@
+# rhosp-fetch-server-ip.yaml
+# Requires:
+# * rhosp_server_info: Variable containing the opensstack server information (https://docs.ansible.com/ansible/latest/collections/openstack/cloud/server_module.html#return-server)
+---
+  - name: "Collect server host private IPV4"
+    ansible.builtin.set_fact:
+      rhosp_instance_cp_array: "{{ (rhosp_instance_cp_array | default([])) + [rhosp_server_info.addresses[rhosp_network] | community.general.json_query(ipv4_fixed_address) | combine ({ 'name' : rhosp_server_info.name })] }}"
+    vars:
+      ipv4_fixed_address: "[?\"OS-EXT-IPS:type\" == 'fixed' && version == `4`]"
+...

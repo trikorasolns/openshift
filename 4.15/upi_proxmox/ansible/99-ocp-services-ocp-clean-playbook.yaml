@@ -1,0 +1,22 @@
+---
+- name: "Fetch kubeadmin account from installation"
+  hosts: "ocp_services"
+  gather_facts: true
+
+  pre_tasks:
+  - name: "Define variables"
+    ansible.builtin.include_tasks:
+      file: tasks/set_ocp_install_dir.yaml
+      
+  tasks:
+  - name: "Remove cluster installation directory"
+    ansible.builtin.file:
+      path: "{{ openshift_cluster_install_dir }}"
+      state: absent
+
+  - name: "Remove OpenShift binarie directory "
+    ansible.builtin.file:
+      path: "{{ openshift_install_dir }}"
+      state: absent
+    when: remove_binaries_dir is defined and (remove_binaries_dir | bool)
+...

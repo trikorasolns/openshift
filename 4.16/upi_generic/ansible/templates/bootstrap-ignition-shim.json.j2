@@ -1,0 +1,18 @@
+{
+  "ignition": {
+    "config": {
+      "merge": [
+        {
+          "httpHeaders": [
+            {
+              "name": "X-Auth-Token",
+              "value": "{{ glance_token }}"
+            }
+          ],
+          "source": "{{ bootstrap_url }}"
+        }
+      ]
+    },
+    "version": "3.2.0"
+  }
+}

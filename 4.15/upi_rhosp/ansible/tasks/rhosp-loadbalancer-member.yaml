@@ -1,0 +1,12 @@
+---
+  - name: "Add members to Load Balancer pool"
+    openstack.cloud.lb_member:
+      address: "{{ rhosp_lb_member_address }}"
+      name: "{{ rhosp_lb_member_name }}"
+      pool: "{{ rhosp_private_pool_member_item.name }}"
+      protocol_port: "{{ rhosp_private_pool_member_item.port }}"
+      state: "{{ rhosp_lb_member_state | default('present')}}"
+    loop: "{{ rhosp_lb_member_ports }}"
+    loop_control:
+      loop_var: rhosp_private_pool_member_item
+...

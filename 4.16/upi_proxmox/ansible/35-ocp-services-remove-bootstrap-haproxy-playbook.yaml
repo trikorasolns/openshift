@@ -1,0 +1,26 @@
+---
+- name: "Remove Bootstrap host"
+  hosts: "ocp_services"
+  gather_facts: true
+
+  pre_tasks:
+  - name: "Define variables"
+    ansible.builtin.include_tasks:
+      file: tasks/set_ocp_install_dir.yaml
+      
+  tasks:
+  - name: "Remove bootstrap"
+    ansible.builtin.lineinfile:
+      path: "/etc/haproxy/haproxy.cfg"
+      state: absent
+      regexp: "^[ ]*server[ ]*{{ item }}.*$"
+      backup: true
+    loop: "{{ groups['ocp_bootstrap'] }}"
+    become: true
+
+  - name: "Restart haproxy to apply the configuration changes"
+    ansible.builtin.service:
+      name: haproxy
+      state: restarted
+    become: true
+...

@@ -1,0 +1,6 @@
+require_packages:
+- python3
+- python3-openstacksdk
+- python3-openstackclient
+- python3-octaviaclient
+- python3-manilaclient

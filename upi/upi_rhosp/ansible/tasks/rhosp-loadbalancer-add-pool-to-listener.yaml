@@ -1,0 +1,10 @@
+---
+# openstack loadbalancer listener set --default-pool <pool-id> <listener-id or listener-name>
+# e.g.: openstack loadbalancer listener set --default-pool ae802348-9d5f-43f3-8fea-acd618b867df http
+- name: "Set default Pool on Listeners"
+  ansible.builtin.shell: |
+    openstack loadbalancer listener set --default-pool {{ rhosp_lb_pool_listener_item.id }} {{ rhosp_lb_pool_listener_item.name }}
+  loop: rhosp_lb_pool
+  loop_control:
+    loop_var: rhosp_lb_pool_item
+...

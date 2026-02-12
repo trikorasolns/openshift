@@ -1,0 +1,23 @@
+---
+- name: "Collect information"
+  import_playbook: _common_rhosp.yaml
+
+- name: "Check required variables"
+  hosts: "localhost"
+  gather_facts: true
+
+- name: "Setup OpenStack Environment"
+  hosts: "localhost"
+  gather_facts: true
+
+  tasks:
+  - name: "Deploy the Operator"
+    ansible.builtin.shell: |
+      oc delete -f https://github.com/rook/rook/raw/refs/heads/release-1.16/deploy/examples/operator-openshift.yaml
+
+  - name: "Check if cluster image exists"
+    ansible.builtin.shell: |
+      oc delete -f https://github.com/rook/rook/raw/refs/heads/release-1.16/deploy/examples/common.yaml
+      oc delete -f https://github.com/rook/rook/raw/refs/heads/release-1.16/deploy/examples/crds.yaml
+
+...

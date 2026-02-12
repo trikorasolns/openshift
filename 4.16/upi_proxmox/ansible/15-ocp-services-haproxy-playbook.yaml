@@ -1,0 +1,45 @@
+---
+- name: "Configure HAProxy"
+  hosts: "ocp_services"
+  gather_facts: true
+
+  tasks:
+
+  - name: Set haproxy_connect_any flag on
+    ansible.posix.seboolean:
+      name: haproxy_connect_any
+      state: true
+      persistent: true
+    become: true
+
+  - name: Set flags
+    ansible.posix.seboolean:
+      name: httpd_can_network_connect
+      state: true
+      persistent: true
+    become: true
+
+  - name: "Set semanage ports"
+    ansible.builtin.shell: |
+        semanage port -a -t http_port_t -p tcp 6443
+        semanage port -a -t http_port_t -p tcp 22623
+        semanage port -a -t http_port_t -p tcp 1936
+    become: true
+
+  - name: "Template haproxy configuration file"
+    ansible.builtin.template:
+      src: "haproxy.cfg.j2"
+      dest: "/etc/haproxy/haproxy.cfg"
+      backup: true
+    vars:
+      use_bootstrap: true
+    become: true
+
+  - name: "Enable and start the required services"
+    ansible.builtin.service:
+      name: haproxy
+      enabled: yes
+      state: restarted
+    become: true
+
+...

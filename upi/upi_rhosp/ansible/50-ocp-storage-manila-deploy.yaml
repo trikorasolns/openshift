@@ -1,0 +1,100 @@
+---
+- name: "Collect information"
+  import_playbook: _common_rhosp.yaml
+  when: ocp_cluster_id_tag is not defined
+
+- name: "Deploy RHOSP Manila as storage Backend"
+  hosts: "{{ ocp_bastion | default('ocp_bastion') | default('localhost') }}"
+  gather_facts: true
+  vars:
+    manila_resource_templates:
+    - kubernetes-cloud-provider-openstack-manila-secret
+    # - kubernetes-cloud-provider-openstack-manila-cm
+    k8s_maj_min_version: "{{ (k8s_version | split('.'))[0] }}.{{ (k8s_version | split('.'))[1] }}"
+
+  pre_tasks:
+  - name: "Get RHOSP information from the environment"
+    ansible.builtin.set_fact:
+      rhosp_os_username: "{{ lookup('ansible.builtin.env', 'OS_USERNAME') }}"
+      rhosp_os_password: "{{ lookup('ansible.builtin.env', 'OS_PASSWORD') }}"
+
+  tasks:
+  - name: "Template Manila resources"
+    ansible.builtin.debug:
+      var: k8s_maj_min_version
+
+  - name: "Template Manila resources"
+    ansible.builtin.template:
+      src: "{{ item }}.yaml.j2"
+      dest: "/tmp/{{ item }}.yaml"
+      mode: 0600
+    loop: "{{ manila_resource_templates }}"
+
+  - name: "Create Manila resources"
+    ansible.builtin.command: |
+      oc apply -f /tmp/{{ item }}.yaml
+    register: ocp_manila_resource_res
+    loop: "{{ manila_resource_templates }}"
+
+  # - name: "Create Manila Config Map"
+  #   ansible.builtin.command: |
+  #     oc apply -f /tmp/kubernetes-cloud-provider-openstack-manila-secret.yaml
+  #   register: ocp_cinder_secret
+
+  # - name: "Create Manila Storage Class"
+  #   ansible.builtin.command: |
+  #     oc apply -f https://raw.githubusercontent.com/kubernetes/cloud-provider-openstack/refs/heads/release-{{ k8s_maj_min_version }}/examples/manila-csi-plugin/nfs/dynamic-provisioning/storageclass.yaml
+
+  - name: "Deploy the RBACs"
+    ansible.builtin.shell: |
+      oc apply -f https://raw.githubusercontent.com/kubernetes/cloud-provider-openstack/refs/tags/{{ kubernetes_cloud_provider_openstack_version }}/manifests/manila-csi-plugin/csi-controllerplugin-rbac.yaml
+      oc apply -f https://raw.githubusercontent.com/kubernetes/cloud-provider-openstack/refs/tags/{{ kubernetes_cloud_provider_openstack_version }}/manifests/manila-csi-plugin/csi-nodeplugin-rbac.yaml
+
+  - name: "Deploy the CSIDriver CRD"
+    ansible.builtin.command: |
+      oc apply -f https://raw.githubusercontent.com/kubernetes/cloud-provider-openstack/refs/tags/{{ kubernetes_cloud_provider_openstack_version }}/manifests/manila-csi-plugin/csidriver.yaml
+
+  - name: "Download Controller and Node plugins to be modified"
+    ansible.builtin.get_url:
+      url: "https://raw.githubusercontent.com/kubernetes/cloud-provider-openstack/refs/tags/{{ kubernetes_cloud_provider_openstack_version }}/manifests/manila-csi-plugin/{{ item }}"
+      dest: "/tmp/{{ item }}"
+      mode: '0640'
+    loop:
+    - csi-controllerplugin.yaml
+    - csi-nodeplugin.yaml
+
+  - name: "Fix MANILA_SHARE_PROTO"
+    ansible.builtin.replace:
+      after: "name: MANILA_SHARE_PROTO"
+      path: "/tmp/{{ item }}"
+      regexp: '^( +)value: "SHARE-PROTOCOL"$'
+      replace: '\1value: "{{ rhosp_manila_share_protcol }}"'
+      # replace: '\1value: "CephFS"'
+    # ansible.builtin.lineinfile:
+    #   path: "/tmp/{{ item }}"
+    #   search_string: 'value: "SHARE-PROTOCOL"'
+    #   line: 'value: "NFS"'
+    loop:
+    - csi-controllerplugin.yaml
+    - csi-nodeplugin.yaml
+
+  # - name: "Modify the Controller and Node plugins"
+  #   ansible.builtin.command: |
+  #     oc apply -f https://raw.githubusercontent.com/kubernetes/cloud-provider-openstack/refs/heads/release-{{ k8s_maj_min_version }}/manifests/manila-csi-plugin/csidriver.yaml
+
+  # - name: "Modify the Controller and Node plugins"
+  #   ansible.builtin.command: |
+  #     oc apply -f https://raw.githubusercontent.com/kubernetes/cloud-provider-openstack/refs/heads/release-{{ k8s_maj_min_version }}/manifests/manila-csi-plugin/csidriver.yaml
+
+  # - name: "Pause until you can verify updates to an application were successful"
+  #   ansible.builtin.pause:
+
+  - name: "Deploy the Controller and Node plugins"
+    ansible.builtin.command: |
+      oc apply -f /tmp/{{ item }}
+    loop:
+    - csi-controllerplugin.yaml
+    - csi-nodeplugin.yaml
+
+...
+ 

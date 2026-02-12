@@ -1,0 +1,35 @@
+
+rhosp_flavor_master: b3-16
+rhosp_flavor_worker: b3-8
+rhosp_lb_flavor: small
+rhosp_lb_public_ports:
+- {name: "api-server", port: 6443, protocol: "TCP"}
+- {name: "https", port: 443, protocol: "TCP"}
+- {name: "http", port: 80, protocol: "TCP"}
+- {name: "stats", port: 9000, protocol: "TCP"}
+rhosp_lb_private_ports:
+- {name: "api-int", port: 22623, protocol: "TCP"}
+- {name: "api-server", port: 6443, protocol: "TCP"}
+ocp_control_plane_count: 3
+ocp_compute_node_count: 8
+
+
+rhosp_compute_node:
+  1:
+    flavor: b3-8
+  2:
+    flavor: b3-8
+  3:
+    flavor: b3-8
+  4:
+    flavor: c3-16
+  5:
+    flavor: c3-16
+  6:
+    flavor: c3-16
+  7:
+    flavor: c3-16
+  8:
+    flavor: c3-16
+  # 9:
+  #   flavor: b3-16

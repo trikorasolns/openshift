@@ -1,0 +1,41 @@
+---
+- name: "Collect information"
+  import_playbook: _common_rhosp.yaml
+  when: ocp_cluster_id_tag is not defined
+
+- name: "Print DNS INFO"
+  hosts: "localhost"
+  gather_facts: true
+
+  tasks:
+  - name: "Fetch FIP information"
+    include_tasks: tasks/rhosp-fetch-fip-info.yaml
+
+  - name: "Get the list of deployed CP nodes"
+    openstack.cloud.server_info:
+      name: "{{ rhosp_control_plane_server_prefix }}"
+    register: rhosp_controlplane_server_info
+
+  - name: 'Get Control Plane server information'
+    openstack.cloud.server_info:
+      name: "{{ rhosp_control_plane_server_prefix }}-{{ item }}"
+    register: ocp_cp_server_res
+    loop: "{{ range(rhosp_controlplane_server_info.servers | length +1 ,4) }}"
+
+  - name: "Print Control Plane server information"
+    ansible.builtin.debug:
+      var: ocp_cp_server_res
+
+  - name: "Print required Control Plane DNS records"
+    ansible.builtin.debug:
+      msg:
+      - "Create DNS registries for domain {{ local_domain}}"
+      - ""
+      - "A record for each Control Plane:"
+
+  - name: "Control Plane DNS records"
+    ansible.builtin.debug:
+      msg:
+      - "  - control-plane-1.{{ ocp_cluster_name }} with IP TBD"
+    loop: ocp_cp_server_res
+...

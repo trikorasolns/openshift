@@ -1,0 +1,53 @@
+---
+- name: "Check restart"
+  hosts: "localhost"
+  gather_facts: true
+
+  tasks:
+  - name: "Check variables"
+    ansible.builtin.assert:
+      that:
+      - nodename is defined and nodename | length > 0
+      - rhosp_instance_name is defined and rhosp_instance_name | length > 0
+      fail_msg:
+      - "nodename must be defined with the OpenShift node name."
+      - "rhosp_instance_name must be defined with the name of the RHOSP instance."
+
+- name: "Start node"
+  hosts: "localhost"
+  gather_facts: true
+
+  tasks:
+  - name: "Start the RHOSP instance"
+    openstack.cloud.server_action:
+      action: start
+      server: "{{ rhosp_instance_name }}"
+      timeout: 200
+
+  # - name: "Wait for the VM to start"
+  #   openstack.cloud.server_info:
+  #     name: "{{ rhosp_instance_name }}"
+  #   register: rhosp_instance_info
+  #   until: "rhosp_instance_info.servers[0].status == 'ACTIVE'"
+  #   retries: 30
+  #   delay: 2
+
+  # - name: "Print wait result"
+  #   ansible.builtin.debug:
+  #     msg: 
+  #     - "rhosp_instance_info: {{ rhosp_instance_info }}"
+  #     - "rhosp_instance_info: {{ rhosp_instance_info | to_json }}"
+
+  # - name: "Uncordon the node"
+  #   ansible.builtin.shell: |
+  #     oc adm uncordon {{ nodename }}
+  #   register: oc_adm_uncordon_res
+
+  # - name: "Print uncordon result"
+  #   ansible.builtin.debug:
+  #     var: oc_adm_uncordon_res
+
+- name: "Post start node"
+  ansible.builtin.import_playbook: ../../ansible/node-post-start.yaml
+
+...

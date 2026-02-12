@@ -1,0 +1,65 @@
+---
+- name: "Collect information"
+  import_playbook: _common_rhosp.yaml
+
+- name: "Check required variables"
+  hosts: "localhost"
+  gather_facts: true
+
+- name: "Setup OpenStack Environment"
+  hosts: "localhost"
+  gather_facts: true
+
+  tasks:
+
+  - name: "Check if cluster image exists"
+    ansible.builtin.shell: |
+      oc create -f https://github.com/rook/rook/raw/refs/heads/{{ rook_release_tag }}/deploy/examples/crds.yaml
+      oc create -f https://github.com/rook/rook/raw/refs/heads/{{ rook_release_tag }}/deploy/examples/common.yaml
+
+  # Deployment violates PodSecurity #11755: https://github.com/rook/rook/issues/11755
+  - name: "Fix NS POD security"
+    ansible.builtin.shell: |
+      oc label ns rook-ceph pod-security.kubernetes.io/enforce=privileged
+
+  - name: "Deploy the Operator"
+    ansible.builtin.shell: |
+      oc create -f https://github.com/rook/rook/raw/refs/heads/{{ rook_release_tag }}/deploy/examples/operator-openshift.yaml
+  
+  - name: "Deploy Ceph Cluster"
+    ansible.builtin.shell: |
+      oc create -f https://github.com/rook/rook/raw/refs/heads/{{ rook_release_tag }}/deploy/examples/cluster.yaml
+
+  - name: "Deploy Object Storage"
+    ansible.builtin.shell: |
+      oc create -f https://github.com/rook/rook/raw/refs/heads/{{ rook_release_tag }}/deploy/examples/object-openshift.yaml
+
+# Dashboard
+  # - name: "Dashboard: deploy services"
+  #   ansible.builtin.shell: |
+  #     oc create -f https://github.com/rook/rook/raw/refs/heads/release-1.16/deploy/examples/dashboard-external-http.yaml
+  #     oc create -f https://github.com/rook/rook/raw/refs/heads/release-1.16/deploy/examples/dashboard-external-https.yaml
+  #     #oc create -f https://github.com/rook/rook/raw/refs/heads/release-1.16/deploy/examples/dashboard-loadbalancer.yaml
+
+  - name: "Create route for dashboard service"
+    ansible.builtin.shell: |
+      oc -n rook-ceph create route passthrough --service=rook-ceph-mgr-dashboard
+
+  - name: "Get the dashboard password"
+    ansible.builtin.shell: |
+      -n rook-ceph get secret rook-ceph-dashboard-password -o jsonpath="{['data']['password']}" | base64 --decode && echo
+    register: rook_dashboard_admin_pw_res
+
+  - name: "Print the dashboard credentials"
+    ansible.builtin.debug:
+      msg:
+      - "https://rook.io/docs/rook/latest-release/Storage-Configuration/Monitoring/ceph-dashboard/#login-credentials"
+      - "default user: admin"
+      - "password: {{ rook_dashboard_admin_pw_res.stdout }}"
+
+# Toolbox
+  - name: "Deploy Toolbox"
+    ansible.builtin.shell: |
+      oc create -f https://github.com/rook/rook/raw/refs/heads/{{ rook_release_tag }}/deploy/examples/toolbox.yaml
+
+...

@@ -1,0 +1,114 @@
+---
+- name: "Cordon and drain node"
+  hosts: "localhost"
+  gather_facts: true
+
+  pre_tasks:
+  - name: "Check variables"
+    ansible.builtin.assert:
+      that:
+      - vm_host is defined and vm_host | length > 0
+      fail_msg:
+      - "vm_host must be defined with the Ansible Inventor host name for the OCP node."
+
+  tasks:
+  - name: "Cordon the node"
+    ansible.builtin.shell: |
+      oc adm cordon {{ hostvars[vm_host].vm_name }}
+    register: oc_adm_cordon_res
+
+  - name: "Print cordon result"
+    ansible.builtin.debug:
+      var: oc_adm_cordon_res
+
+  - name: "Drain node"
+    ansible.builtin.shell: |
+      oc adm drain {{ hostvars[vm_host].vm_name }}
+    register: oc_adm_drain_res
+    failed_when: false
+
+  - name: "Print drain result"
+    ansible.builtin.debug:
+      var: oc_adm_drain_res
+
+  - name: "Drain force"
+    ansible.builtin.shell: |
+      oc adm drain {{ hostvars[vm_host].vm_name }} --delete-emptydir-data --ignore-daemonsets
+    when: oc_adm_drain_res.rc != 0
+    register: oc_adm_drain_force_res
+
+  - name: "Print drain force result"
+    ansible.builtin.debug:
+      var: oc_adm_drain_force_res
+    when: oc_adm_drain_force_res is defined
+
+- name: "Setup Proxmox VMs"
+  hosts: "proxmox_nodes"
+  gather_facts: true
+
+  tasks:
+  - name: "Shutdown VM on it's node"
+    ansible.builtin.include_role:
+      name: ../../../ansible/roles/proxmox/vm_state
+    vars:
+      vm_state_vmid: "{{ hostvars[vm_host].pve.vmid }}"
+      vm_state_state: "Stopped"
+    when: ansible_hostname == hostvars[vm_host].pve.owner
+
+  - name: "Wait for the VM to shutdown"
+    ansible.builtin.shell: |
+      qm status {{ hostvars[vm_host].pve.vmid }}
+    when: ansible_hostname == hostvars[vm_host].pve.owner
+    register: qm_status_res
+    until: "'stopped' in qm_status_res.stdout"
+    retries: 30
+    delay: 2
+
+  - name: "Print wait result"
+    ansible.builtin.debug:
+      msg: 
+      - "qm_status_res: {{ qm_status_res }}"
+      - "qm_status_res: {{ qm_status_res | to_json }}"
+
+  - name: "Start the VM on it's node"
+    ansible.builtin.include_role:
+      name: ../../../ansible/roles/proxmox/vm_state
+    vars:
+      vm_state_vmid: "{{ hostvars[vm_host].pve.vmid }}"
+      vm_state_state: "Started"
+    # ansible.builtin.include_tasks:
+    #   file: tasks/proxmox_vm_start.yaml
+    # vars:
+    #   vm_name: "{{ node_name }}"
+    #   state: "Started"
+    when: ansible_hostname == hostvars[vm_host].pve.owner
+
+  # - name: "Wait for the VM to start"
+  #   ansible.builtin.shell: |
+  #     qm status {{ hostvars[vm_host].pve.vmid }}
+  #   when: ansible_hostname == hostvars[vm_host].pve.owner
+  #   register: qm_status_res
+  #   until: "'stopped' in qm_status_res.stdout"
+  #   retries: 30
+  #   delay: 2
+
+  - name: "Print wait result"
+    ansible.builtin.debug:
+      msg: 
+      - "qm_status_res: {{ qm_status_res }}"
+      - "qm_status_res: {{ qm_status_res | to_json }}"
+
+- name: "Uncordon the OCP node"
+  hosts: "localhost"
+  gather_facts: true
+
+  tasks:
+  - name: "Uncordon the node"
+    ansible.builtin.shell: |
+      oc adm uncordon {{ hostvars[vm_host].vm_name }}
+    register: oc_adm_uncordon_res
+
+  - name: "Print uncordon result"
+    ansible.builtin.debug:
+      var: oc_adm_uncordon_res
+...

@@ -1,0 +1,47 @@
+---
+
+- name: "Check required variables"
+  hosts: "localhost"
+  gather_facts: true
+
+  tasks:
+  - name: "Check required variables"
+    ansible.builtin.assert:
+      that:
+        - ocp_cluster_name is defined and (ocp_cluster_name | length > 0)
+      fail_msg:
+        - "The name of the OCP cluster must be defined in the 'ocp_cluster_name' variable."
+
+  - name: "Define variables"
+    ansible.builtin.include_tasks:
+      file: tasks/set_ocp_install_dir.yaml
+
+- name: "Setup OpenStack Environment"
+  hosts: "localhost"
+  gather_facts: true
+
+
+  tasks:
+
+  - name: "Wait for the bootstrap process to finish"
+    ansible.builtin.shell: |
+      ./openshift-install wait-for bootstrap-complete --dir {{ ocp_cluster_name }}/
+    args:
+      chdir: "{{ openshift_install_dir }}"
+    register: ocp_boostrap_complete_res
+
+  - name: "RHCOS output"
+    ansible.builtin.debug:
+      var: ocp_boostrap_complete_res
+
+  - name: "Wait for the cluster install to finish"
+    ansible.builtin.shell: |
+      ./openshift-install wait-for install-complete --dir {{ ocp_cluster_name }}/
+    args:
+      chdir: "{{ openshift_install_dir }}"
+    register: ocp_install_complete_res
+
+  - name: "RHCOS output"
+    ansible.builtin.debug:
+      var: ocp_install_complete_res
+...

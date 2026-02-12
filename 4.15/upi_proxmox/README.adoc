@@ -1,0 +1,631 @@
+= OCP UPI Installation on Proxmox
+Antonio C. <ac (at) trikorasolutions (dot) com>
+:revdate: {docdate}
+:icons: font
+:toc: left
+:toclevels: 3
+:toc-title: Table of Contents
+:description: OCP UPI Installation on Proxmox
+
+== Introduction
+
+[.lead]
+This document describes the OCP installation process using UPI. It automates 
+ the instructions found at https://blog.rossbrigoli.com/2020/11/running-openshift-at-home-part-44.html.
+
+== Prepare Hosts (VMs)
+
+Create 8 VM:
+* 1 VM for the installation bootstrap
+* 1 VM for OCP Services
+* 3 VM for Control Plane (master)
+* 2 VM for Compute Nodes (worker)
+
+
+[%header, cols="40%m,10%m,25%m,25%m"]
+|===
+
+| Role | vCPU | RAM | Storage
+| bootstrap | 4 | 16 GB | 120 GB
+| control-plane | 4 | 16 GB | 120 GB
+| compute | 4 | 16 GB | 120 GB
+| services | 4 | 4 GB | 100 GB
+
+|===
+
+=== Assign fixed IPs
+
+Assign the VMs fixed IP addresses as they will be used by the HA Proxy and internally.
+
+=== Create the bootstrap VM on Proxmox using the CLI
+
+[source,bash]
+----
+VMID=109
+qm create ${VMID} \
+  --description "ocp4-bootstrap" \
+  --name "ocp4-bootstrap" \
+  --tags 'ocp4;tmp'
+
+qm set ${VMID} --sockets 1 --cores 4 --cpu 'x86-64-v2-AES'
+qm set ${VMID} --memory 16384
+qm set ${VMID} --ostype l26
+qm set ${VMID} --scsihw virtio-scsi-single
+qm set ${VMID} --cdrom none
+----
+
+==== Set the Storage
+
+===== Local
+
+Create a VM Drive on the nodes `local-lvm``.
+
+[source,bash]
+----
+qm set ${VMID} --scsi0 local-lvm:120
+----
+
+===== iSCSI
+
+To use a iSCSI storage first check for the currently identified volumes.
+
+[source,bash]
+----
+pvesm list <iscsi_storage_name>
+----
+
+The output will be something like this.
+
+[source,]
+----
+Volid                                                    Format  Type              Size VMID
+<iscsi_storage_name>:0.0.0.scsi-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx0 raw     images    128849018880
+<iscsi_storage_name>:0.0.1.scsi-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx1 raw     images    128849018880
+<iscsi_storage_name>:0.0.2.scsi-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx2 raw     images    128849018880
+<iscsi_storage_name>:0.0.3.scsi-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx3 raw     images    128849018880
+<iscsi_storage_name>:0.0.4.scsi-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx4 raw     images    128849018880
+<iscsi_storage_name>:0.0.5.scsi-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx5 raw     images    107374182400
+----
+
+Select which volume to attach and execute the following command.
+=== Assign fixed IPs
+
+Assign the VMs fixed IP addresses as they will be used by the HA Proxy and internally.
+
+----
+qm set ${VMID} --net0 virtio,firewall=1,bridge=vmbr0
+----
+
+Specify the MAC address using the `macaddr=XX:XX:XX:XX:XX:XX` option.
+
+==== Set the boot order
+
+[source,bash]
+----
+qm set ${VMID} --boot 'order=scsi0;ide2;net0'
+----
+
+=== Ansible
+
+Build Ansible inventory
+
+.09-pve.yaml
+[source,yaml]
+----
+# proxmox
+proxmox:
+  children:
+    proxmox_vms:
+      hosts:
+        ocp4-services:
+          description: ocp4-services
+          ansible_host: 
+          ansible_user: 
+          ansible_ssh_private_key_file: 
+          my_mac:
+          my_ipv4: 
+          pve:
+            owner: pve01
+            vmid: 100
+        ocp4-bootstrap:
+          description: ocp4-bootstrap
+          ansible_host: 
+          ansible_user: 
+          ansible_ssh_private_key_file: 
+          my_mac: 
+          my_ipv4: 
+          pve:
+            owner: pve01
+            vmid: 101
+        ocp4-cp-1:
+          description: ocp4-control-plane-1
+          ansible_host: 
+          ansible_user: 
+          ansible_ssh_private_key_file: 
+          my_mac: 
+          my_ipv4: 
+          pve:
+            owner: pve01
+            vmid: 102
+        ocp4-cp-2:
+          description: ocp4-control-plane-2
+          ansible_host: 
+          ansible_user: 
+          ansible_ssh_private_key_file: 
+          my_mac: 
+          my_ipv4: 
+          pve:
+            owner: pve02
+            vmid: 103
+        ocp4-cp-3:
+          description: ocp4-control-plane-3
+          ansible_host: 
+          ansible_user: 
+          ansible_ssh_private_key_file: 
+          my_mac: 
+          my_ipv4: 
+          pve:
+            owner: pve03
+            vmid: 104
+        ocp4-co-1:
+          description: ocp4-compute-node-1
+          ansible_host: 
+          ansible_user: 
+          ansible_ssh_private_key_file: 
+          my_mac: 
+          my_ipv4: 
+          pve:
+            owner: pve02
+            vmid: 105
+        ocp4-co-2:
+          description: ocp4-compute-node-2
+          ansible_host: 
+          ansible_user: 
+          ansible_ssh_private_key_file: 
+          my_mac: 
+          my_ipv4: 
+          pve:
+            owner: pve03
+            vmid: 106
+----
+
+.15-openshift.yaml
+[source,yaml]
+----
+ocp:
+  children:
+    ocp_bootstrap:
+      hosts:
+        ocp4-bootstrap:
+    ocp_control_plane:
+      hosts:
+        ocp4-cp-1:
+        ocp4-cp-2:
+        ocp4-cp-3:
+    ocp_compute_node:
+      hosts:
+        ocp4-co-1:
+        ocp4-co-2:
+    ocp_services:
+      hosts:
+        ocp4-services:
+----
+
+Execute the playbook that creates the VMs.
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/upi_proxmox/ansible/01-proxmox-vms.yaml \
+  -e @ocp/4.15/upi_proxmox/ansible/defaults/main.yaml \
+  -e '{"selected_groups": ["ocp_control_plane","ocp_bootstrap"]}'
+----
+
+=== Start
+
+
+== Collect information
+
+Set environment variables used in the installation.
+
+[source,bash]
+----
+RH_CLUSTER_PULL_SECRET='{"auths":{"cloud.openshift.com":...'<1>
+SSH_PUB_KEY_FILE=~/.ssh/id_rsa_somefile.pub<2>
+----
+<1> RedHat Openshift cloud pull secret.
+ Get a Red Hat pull secret by going to https://cloud.redhat.com/.
+ Select the _Access the Console_ link and login to the link:https://console.redhat.com/[Hybrid Cloud console].
+ Open the _Services_ dropdown and navigate to _Platform > Red Hat OpenShift_. 
+ On the _OpenShift > Overview_ page navigate to _Cluster List_, using the left menu, and press _Create Cluster_. 
+ Under the cluster type tab select _Local_ and press the _Copy pull secret_.
+<2> SSH public key used to access the cluster hosts
+
+== Install
+
+[.lead]
+Generate OCP Cluster installation folder and download the OCP binaries.
+
+This will generate a directory with name defined on the `ocp_install_root_dir`
+ variable. This directory will be placed under the `ansible_user` home 
+ directory if the `ocp_install_root_dir_under_user_home` variable is true.
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/upi_proxmox/ansible/02-ocp-services-oi-binaries.yaml \
+  -e bootstrap_host=ocp_services
+  -e @ocp/4.15/upi_proxmox/ansible/defaults/main.yaml \
+----
+
+[.lead]
+Configure the OCP Services host. This playbook will perform the following 
+ tasks
+
+* Install several packages
+* Enable services for the HTTP and HAProxy
+* Perform several configurations on the host
+
+[source,yaml]
+----
+include::ansible/defaults/main.yaml[tag=required_packages]
+----
+
+* Enable and start services
+* Open firewall ports
+* Perform configuration on the host
+* Copy OCP installation files to the http server
+
+[WARNING]
+====
+Add `-K`, or `--ask-become-pass` if your host required password for sudo.
+====
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/upi_proxmox/ansible/10-ocp-services-config-host-playbook.yaml \
+  -e @ocp/4.15/upi_proxmox/ansible/defaults/main.yaml
+----
+
+Configure HA Proxy.
+
+This playbook will make several configurations to the server required for
+ _HAProxy_ to work correctly and also apply the `haproxy.cfg.j2` template to 
+ generate the _HAProxy_ configuration file.
+
+[WARNING]
+====
+Add `-K`, or `--ask-become-pass` if your host required password for sudo.
+====
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/upi_proxmox/ansible/15-ocp-services-haproxy-playbook.yaml \
+  -e @ocp/4.15/upi_proxmox/ansible/defaults/main.yaml \
+  -e @_local_config/network.yaml
+----
+
+[.lead]
+Generate the _OpenShift Cluster_ installation directory and generate the 
+ Kubernetes manifests and Ignition configuration files for the cluster.
+ 
+This is done using the `openshift-install` CLI.
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/ansible/18-ocp-services-oi-playbook.yaml \
+  -e @ocp/4.15/upi_proxmox/ansible/defaults/main.yaml \
+  -e @_local_config/network.yaml \
+  -e pull_secret=${RH_CLUSTER_PULL_SECRET} \
+  -e ssh_pub_key_file=${SSH_PUB_KEY_FILE}
+----
+
+Copy the Ignition configuration files to the httpd www folder so they can be 
+ fetched by the CoreOS installer.
+
+[WARNING]
+====
+Add `-K`, or `--ask-become-pass` if your host required password for sudo.
+====
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/upi_proxmox/ansible/19-ocp-services-ign-www-playbook.yaml \
+  -e @ocp/4.15/upi_proxmox/ansible/defaults/main.yaml \
+  -e @_local_config/network.yaml
+----
+
+
+== Deploy Bootstrap and Control Planes
+
+Prepare the VMs for installation.
+
+This playbook will perform the following tasks for each of the Proxmox hosts containing VMS:
+* ~Upload the ISO identified on the _CoreOS ISO disk location_ into the Proxmox server and setup the CDROM on the Bootstrap and Control Plane VMs.~
+* Generate a fake Ignition ISO with a bash script for ease of installation
+* Stop the VMs if they're running.
+* Set the correct boot order. This is required if the VMs are being reused.
+* Set the ISO as the Fake ignition ISO VM CDROM media.
+* Start the VM for Bootstrap and Control Plane.
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/upi_proxmox/ansible/20-proxmox-prepare-coreos-install.yaml \
+  -e @ocp/4.15/upi_proxmox/ansible/defaults/main.yaml \
+  -e skip_download=true <1>
+----
+<1> Optional variable to skip downloading the ISO if it is already downloaded.
+
+Extract the installation sources and scripts from the `openshift-install`, as 
+ well as the `coreos-installer` command to be executed.
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/upi_proxmox/ansible/25-ocp-services-show-rhcos-info.yaml \
+  -e @ocp/4.15/upi_proxmox/ansible/defaults/main.yaml
+----
+
+Execute the `coreos-installer` command obtained on the previous Ansible 
+ playbook.
+
+The VMs are setup so it's time to start the OpenShift cluster deployment.
+ Stop the VMs, reset the boot and CD ROM configuration and start the VMS.
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/upi_proxmox/ansible/28-proxmox-vm-start-deployment.yaml \
+  -e @ocp/4.15/upi_proxmox/ansible/defaults/main.yaml
+----
+
+=== Followup on the deployment
+
+[.lead]
+Check when the nodes are created
+
+SSH to the services VM and go to the OCP installation root dir.
+
+[source,bash]
+----
+./oc --kubeconfig ocp/auth/kubeconfig get nodes -w
+----
+
+The result we're looking for is something like this.
+
+[source,]
+----
+NAME                   STATUS   ROLES                         AGE   VERSION
+ocp4-control-plane-1   Ready    control-plane,master,worker   26m   v1.28.10+a2c84a5
+ocp4-control-plane-2   Ready    control-plane,master,worker   25m   v1.28.10+a2c84a5
+ocp4-control-plane-3   Ready    control-plane,master,worker   27m   v1.28.10+a2c84a5
+----
+
+Wait for the bootstrap operation to finish. From the openshift root folder on 
+ the _ocp_services_ host execute the following command.
+
+[source,bash]
+----
+./openshift-install --dir ocp/ wait-for bootstrap-complete --log-level=debug
+----
+
+Check for what's missing for the cluster to be stable.
+
+[source,bash]
+----
+./oc --kubeconfig ocp/auth/kubeconfig  adm wait-for-stable-cluster --minimum-stable-period=5s
+----
+
+Follow the installation from the bootstrap node console.
+
+[source,bash]
+----
+journalctl -b -f -u release-image.service -u bootkube.service
+----
+
+Follow the logs on the Control Plane.
+
+Get the authentication.
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/upi_proxmox/ansible/50-ocp-services-get-ocp-auth-playbook.yaml \
+  -e @ocp/4.15/upi_proxmox/ansible/defaults/main.yaml
+----
+
+=== Copy the kubernetes config file
+
+[source,bash]
+----
+scp -i ssh_key_file <user>@<ocp_services_ip>:openshift/ocp/auth/kubeconfig ${HOME}/.kube/ocp-config
+----
+
+== Remove the Bootstrap
+
+Once the installation is finished remove the Bootstrap VM.
+
+The `wait-for bootstrap-complete` command will finish with the following 
+ message.
+
+[source,]
+----
+INFO It is now safe to remove the bootstrap resources 
+DEBUG Time elapsed per stage:                      
+DEBUG Bootstrap Complete: 12m30s                   
+DEBUG                API: 1m12s                    
+INFO Time elapsed: 12m30s       
+----
+
+Remove the bootstrap host from the installation. This will stop the bootstrap 
+ VM and remove it from the _HA Proxy_.
+
+[WARNING]
+====
+Add `-K`, or `--ask-become-pass` if your host required password for sudo.
+====
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/upi_proxmox/ansible/35-ocp-services-remove-bootstrap-haproxy-playbook.yaml \
+  -e @ocp/4.15/upi_proxmox/ansible/defaults/main.yaml
+----
+
+== Add Compute Nodes
+
+Generate compute node VMS.
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/upi_proxmox/ansible/01-proxmox-vms.yaml \
+  -e @ocp/4.15/upi_proxmox/ansible/defaults/main.yaml \
+  -e '{"selected_groups": ["ocp_compute_node"]}'<1>
+  -e '{"vm_host_list": ["ocp4-co-3"]}'<2>
+----
+<1> Deploy all hosts on the `ocp_compute_node` group. Use the 
+ `selected_groups` option to deploy all _Compute Node_ hosts.
+<2> Used to select a specific compute node, for instances when adding a new 
+ compute node to the cluster.
+
+Start the `compute-node` VMs to execute the ignition installation.
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/upi_proxmox/ansible/20-proxmox-prepare-coreos-install.yaml \
+  -e @ocp/4.15/upi_proxmox/ansible/defaults/main.yaml \
+  -e '{"selected_groups": ["ocp_compute_node"]}'
+  -e '{"vm_host_list": ["ocp4-co-3"]}'
+  -e skip_download=true
+----
+
+Extract the installation sources and scripts from the `openshift-install`, as 
+ well as the `coreos-installer` command to be executed.
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/upi_proxmox/ansible/25-ocp-services-show-rhcos-info.yaml \
+  -e @ocp/4.15/upi_proxmox/ansible/defaults/main.yaml
+----
+
+Once all the VMs show the `Install complete` message the VMs are setup. It's 
+ now time to start the deployment of the OpenShift compute nodes.
+ Stop the VMs, reset the boot and CD ROM configuration and start the VMS.
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/upi_proxmox/ansible/28-proxmox-vm-start-deployment.yaml \
+  -e @ocp/4.15/upi_proxmox/ansible/defaults/main.yaml \
+  -e '{"selected_groups": ["ocp_compute_node"]}'
+  -e '{"vm_host_list": ["ocp4-co-3"]}'
+----
+
+Wait for the installation to finish.
+
+Source: https://docs.openshift.com/container-platform/4.15/installing/installing_platform_agnostic/installing-platform-agnostic.html
+
+Review the pending CSRs and ensure that you see the client requests with the 
+ Pending or Approved status for each machine added to the cluster.
+
+[source,bash]
+----
+oc get csr
+----
+
+Approve each of the CSR
+
+[source,bash]
+----
+oc adm certificate approve <csr_name> 
+----
+
+To approve all pending CSRs, run the following command:
+
+[source,bash]
+----
+oc get csr -o go-template='{{range .items}}{{if not .status}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}' | xargs --no-run-if-empty oc adm certificate approve
+----
+
+== Cleanup
+
+[.lead]
+Cleanup installation folder.
+
+[WARNING]
+====
+The Openshift installation folder is required to maintain the cluster.
+====
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/upi_proxmox/ansible/99-ocp-services-ocp-clean-playbook.yaml \
+  -e @ocp/4.15/upi_proxmox/ansible/defaults/main.yaml \
+  -e remove_binaries_dir=true <1>
+----
+<1> Also remove the folder containing the OpenShift binaries
+
+== Troubleshooting
+
+=== Remove the taints on the nodes so the control-plane nodes can execute  application loads
+
+Remove the taints on the nodes so the control-plane nodes can execute 
+ application loads and finish the cluster deployment.
+
+[source,bash]
+----
+ansible-playbook ocp/4.15/upi_proxmox/ansible/31-ocp-services-remove-cp-taints.yaml \
+  -e @ocp/4.15/upi_proxmox/ansible/defaults/main.yaml
+----
+
+=== No CNI configuration file in /etc/kubernetes/cni/net.d/. Has your network provider started? 
+
+*Problem*
+
+Control plane nodes stay at `NotReady` state.
+
+*Symptom*
+
+On the journal the following error shows.
+
+[source,]
+----
+openshift Network plugin returns error: No CNI configuration file in /etc/kubernetes/cni/net.d/
+----
+
+*Cause*
+
+There's no configured CNI.
+
+*Solution*
+
+[source,bash]
+----
+sudo bash -c 'cat << EOF | tee /etc/kubernetes/cni/net.d/10-containerd-net.conflist
+{
+ "cniVersion": "1.0.0",
+ "name": "containerd-net",
+ "plugins": [
+   {
+     "type": "bridge",
+     "bridge": "cni0",
+     "isGateway": true,
+     "ipMasq": true,
+     "promiscMode": true,
+     "ipam": {
+       "type": "host-local",
+       "ranges": [
+         [{
+           "subnet": "10.128.0.0/14"
+         }]
+       ],
+       "routes": [
+         { "dst": "0.0.0.0/0" },
+         { "dst": "::/0" }
+       ]
+     }
+   },
+   {
+     "type": "portmap",
+     "capabilities": {"portMappings": true},
+     "externalSetMarkChain": "KUBE-MARK-MASQ"
+   }
+ ]
+}
+EOF'
+
+sudo systemctl restart crio; sudo systemctl restart kubelet; sudo systemctl status crio
+----

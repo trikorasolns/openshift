@@ -1,0 +1,138 @@
+---
+- name: "Collect information"
+  import_playbook: _common_rhosp.yaml
+  when: ocp_cluster_id_tag is not defined
+
+- name: "Deploy Compute Node instances"
+  hosts: "localhost"
+  gather_facts: true
+
+  tasks:
+
+  - name: "Check if any Compute Node instances exists on RHOSP"
+    openstack.cloud.server_info:
+      name: "{{ rhosp_compute_node_server_prefix }}"
+    register: rhosp_computenode_server_info
+
+  - name: "Print Compute Node server info"
+    ansible.builtin.debug:
+      var: rhosp_computenode_server_info
+      # verbosity: 2
+
+  - name: 'Create the Compute Node servers'
+    openstack.cloud.server:
+      name: "{{ rhosp_compute_node_server_prefix }}-{{ item }}"
+      image: "{{ rhosp_rhcoreos_image_name }}"
+      flavor: "{{ rhosp_compute_node[item].flavor | default(rhosp_flavor_worker) }}"
+      userdata: "{{ lookup('file', '/tmp/worker-' + metadata_json.infraID + '.ign') | string }}"
+      network: "{{ rhosp_network }}"
+      auto_floating_ip: false
+      # nics:
+      # - port-name: "{{ os_port_controlplane }}"
+      # meta: "{{ ocp_cluster_id_tag }}"
+      meta: 
+        openshiftClusterID: "{{ ocp_infra_id }}"
+        hostname: "{{ rhosp_compute_node_server_prefix }}-{{ item }}"
+      # wait: false # due to TypeError: 'NoneType' object is not subscriptable
+      security_groups:
+      - default
+    when: rhosp_computenode_server_info.servers | length < ocp_compute_node_count
+    loop: "{{ range(rhosp_computenode_server_info.servers | length +1 , ocp_compute_node_count + 1) }}"
+
+  # - name: "Add members to the public load-balancer pool"
+  #   openstack.cloud.lb_member:
+  #     name: "{{ rhosp_compute_node_server_prefix }}-{{ item }}"
+  #     pool: "{{ rhosp_loadbalancer_pool_name }}-public"
+  #     state: present
+  #   loop: "{{ range(1,4) }}"
+
+  # - name: "Add members to the private load-balancer pool"
+  #   openstack.cloud.lb_member:
+  #     name: "{{ rhosp_compute_node_server_prefix }}-{{ item }}"
+  #     pool: "{{ rhosp_loadbalancer_pool_name }}-internal"
+  #     state: present
+  #   loop: "{{ range(1,4) }}"
+
+  - name: "Fetch server info"
+    openstack.cloud.server_info:
+      name: "{{ rhosp_compute_node_server_prefix }}"
+    register: rhosp_computenode_server_info
+
+  # - name: 'Create the Compute Node ports'
+  #   openstack.cloud.port:
+  #     name: "{{ item.1 }}-{{ item.0 }}"
+  #     network: "{{ os_network }}"
+  #     security_groups:
+  #     - "{{ os_sg_master }}"
+  #     allowed_address_pairs:
+  #     - ip_address: "{{ os_apiVIP }}"
+  #     - ip_address: "{{ os_ingressVIP }}"
+  #   with_indexed_items: "{{ [os_port_master] * os_cp_nodes_number }}"
+  #   register: ports
+  #   # when: os_subnet6_range is not defined
+
+  # - name: 'Create the dualstack Compute Node ports'
+  #   openstack.cloud.port:
+  #     name: "{{ item.1 }}-{{ item.0 }}"
+  #     network: "{{ os_network }}"
+  #     security_groups:
+  #     - "{{ os_sg_master }}"
+  #     allowed_address_pairs:
+  #     - ip_address: "{{ os_apiVIP }}"
+  #     - ip_address: "{{ os_apiVIP6 }}"
+  #     - ip_address: "{{ os_ingressVIP }}"
+  #     - ip_address: "{{ os_ingressVIP6 }}"
+  #   with_indexed_items: "{{ [os_port_master] * os_cp_nodes_number }}"
+  #   register: ports
+  #   when: os_subnet6_range is defined
+
+  # - name: 'Set Compute Node ports tag'
+  #   ansible.builtin.command:
+  #     cmd: "openstack port set --tag {{ cluster_id_tag }} {{ item.1 }}-{{ item.0 }}"
+  #   with_indexed_items: "{{ [os_port_master] * os_cp_nodes_number }}"
+
+  # - name: 'List the Server groups'
+  #   ansible.builtin.command:
+  #     # os-compute-api-version 2.15 oansible-playbook ocp/4.15/upi_rhosp/ansible/20.15-rhosp-load-balancer-members.yaml \
+  #     # os-compute-api-version 2.15 or higher is required for the 'soft-anti-affinity' policy
+  #     openstack --os-compute-api-version=2.15 server group create -f json -c id --policy=soft-anti-affinity {{ os_cp_server_group_name }}
+  #   register: server_group_created
+  #   when:
+  #   - server_group_id is not defined
+
+  # - name: 'Parse the Server group ID from creation'
+  #   ansible.builtin.set_fact:
+  #     server_group_id: "{{ (server_group_created.stdout | from_json).id }}"
+  #   when:
+  #   - server_group_id is not defined
+
+  # - name: 'Create the Compute Node servers'
+  #   openstack.cloud.server:
+  #     name: "{{ item.1 }}-{{ item.0 }}"
+  #     image: "{{ os_image_rhcos }}"
+  #     flavor: "{{ rhosp_flavor_master }}"
+  #     auto_ip: no
+  #     # The ignition filename will be concatenated with the Compute Node node
+  #     # name and its 0-indexed serial number.
+  #     # In this case, the first node will look for this filename:
+  #     #    "{{ infraID }}-master-0-ignition.json"
+  #     userdata: "{{ lookup('file', [item.1, item.0, 'ignition.json'] | join('-')) | string }}"
+  #     nics:
+  #     - port-name: "{{ os_port_master }}-{{ item.0 }}"
+  #     scheduler_hints:
+  #       group: "{{ server_group_id }}"
+  #     meta: "{{ ocp_cluster_id_tag }}"
+  #   with_indexed_items: "{{ [os_cp_server_name] * os_cp_nodes_number }}"
+
+# Load Balancer
+  - name: "Add compute node to load balancer"
+    include_tasks: tasks/rhosp-loadbalancer-member.yaml
+    vars:
+      rhosp_lb_member_address: "{{ rhosp_public_lb_pool_members_item.addr }}"
+      rhosp_lb_member_name: "{{ rhosp_public_lb_pool_members_item.name }}"
+      rhosp_lb_member_pool: "{{ rhosp_loadbalancer_pool_name }}-public"
+      rhosp_lb_member_ports: "{{ rhosp_lb_public_ports }}"
+    loop: "{{ rhosp_instance_cp_array + rhosp_instance_bootstrap_array }}"
+    loop_control:
+      loop_var: rhosp_public_lb_pool_members_item
+...

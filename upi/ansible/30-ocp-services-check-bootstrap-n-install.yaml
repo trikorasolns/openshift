@@ -1,0 +1,44 @@
+---
+- name: "Install Openshift Install"
+  hosts: "{{ bastion_host | default('localhost')}}"
+  gather_facts: true
+
+  pre_tasks:
+  - name: "Validate required variables"
+    ansible.builtin.assert:
+      that:
+      - "ocp_install_root_dir is defined and ocp_install_root_dir | length > 0"
+      - "ocp_cluster_name is defined and ocp_cluster_name | length > 0"
+
+  - name: "Set variables"
+    ansible.builtin.set_fact:
+      openshift_client_root_url: "https://mirror.openshift.com/pub/openshift-v4/{{ ocp_release_arch }}/clients/ocp/{{ ocp_version }}"
+
+  - name: "Define variables"
+    ansible.builtin.include_tasks:
+      file: tasks/set_ocp_install_dir.yaml
+
+
+  - name: "Check the Bootstrap process"
+    ansible.builtin.shell: |
+      ./openshift-install wait-for bootstrap-complete --dir={{  ocp_cluster_name  }} --log-level debug
+    args:
+      chdir: "{{ openshift_install_dir }}"
+    register: bootstrap_output
+
+  - name: "Print the cluster bootstrap output"
+    ansible.builtin.debug:
+      var: bootstrap_output
+
+  - name: "Check the Installation process"
+    ansible.builtin.shell: |
+      ./openshift-install wait-for install-complete --dir={{  ocp_cluster_name  }} --log-level debug
+    args:
+      chdir: "{{ openshift_install_dir }}"
+    register: install_output
+
+  - name: "Print the cluster install output"
+    ansible.builtin.debug:
+      var: install_output
+
+...

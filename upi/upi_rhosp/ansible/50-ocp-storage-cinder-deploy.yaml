@@ -1,0 +1,70 @@
+---
+- name: "Collect information"
+  import_playbook: _common_rhosp.yaml
+  when: ocp_cluster_id_tag is not defined
+
+- name: "Deploy RHOSP Cinder as storage Backend"
+  hosts: "{{ ocp_bastion | default('ocp_bastion') | default('localhost') }}"
+  gather_facts: true
+
+  pre_tasks:
+  - name: "Get RHOSP information from the environment"
+    ansible.builtin.set_fact:
+      rhosp_os_username: "{{ lookup('ansible.builtin.env', 'OS_USERNAME') }}"
+      rhosp_os_password: "{{ lookup('ansible.builtin.env', 'OS_PASSWORD') }}"
+
+  tasks:
+  # To be used on Cinter
+  - name: "Template cloud.conf"
+    ansible.builtin.set_fact:
+      rhosp_cloud_conf: "{{ lookup('template', 'cloud.conf.j2') }}"
+  
+  - name: "Template cloud.conf Secret"
+    ansible.builtin.template:
+      src: csi-secret-cinderplugin.yaml.j2
+      dest: "/tmp/csi-secret-cinderplugin.yaml"
+      mode: 0600
+
+  - name: "Create cloud.conf secret"
+    ansible.builtin.shell: |
+      oc apply -f /tmp/csi-secret-cinderplugin.yaml
+    register: ocp_cinder_secret
+
+  - name: "Delete the cloud.conf file"
+    ansible.builtin.file:
+      path: "/tmp/csi-secret-cinderplugin.yaml"
+      state: absent
+
+  - name: "Copy Storage Class file to ansible host"
+    copy:
+      src: kubernetes-cloud-provider-openstack-cinder-sc.yaml
+      dest: /tmp/kubernetes-cloud-provider-openstack-cinder-sc.yaml
+
+  - name: "Apply Manifests"
+    ansible.builtin.shell: |
+      # oc apply -f https://github.com/kubernetes/cloud-provider-openstack/raw/refs/heads/master/manifests/cinder-csi-plugin/cinder-csi-controllerplugin-rbac.yaml
+      # oc apply -f https://github.com/kubernetes/cloud-provider-openstack/raw/refs/heads/master/manifests/cinder-csi-plugin/cinder-csi-controllerplugin.yaml
+      # oc apply -f https://github.com/kubernetes/cloud-provider-openstack/raw/refs/heads/master/manifests/cinder-csi-plugin/cinder-csi-nodeplugin-rbac.yaml
+      # oc apply -f https://github.com/kubernetes/cloud-provider-openstack/raw/refs/heads/master/manifests/cinder-csi-plugin/cinder-csi-nodeplugin.yaml
+      # oc apply -f https://github.com/kubernetes/cloud-provider-openstack/raw/refs/heads/master/manifests/cinder-csi-plugin/csi-cinder-driver.yaml
+      # oc apply -f /tmp/kubernetes-cloud-provider-openstack-cinder-sc.yaml
+      oc apply -f {{ item }}
+    loop:
+    - https://github.com/kubernetes/cloud-provider-openstack/raw/refs/heads/master/manifests/cinder-csi-plugin/cinder-csi-controllerplugin-rbac.yaml
+    - https://github.com/kubernetes/cloud-provider-openstack/raw/refs/heads/master/manifests/cinder-csi-plugin/cinder-csi-controllerplugin.yaml
+    - https://github.com/kubernetes/cloud-provider-openstack/raw/refs/heads/master/manifests/cinder-csi-plugin/cinder-csi-nodeplugin-rbac.yaml
+    - https://github.com/kubernetes/cloud-provider-openstack/raw/refs/heads/master/manifests/cinder-csi-plugin/cinder-csi-nodeplugin.yaml
+    - https://github.com/kubernetes/cloud-provider-openstack/raw/refs/heads/master/manifests/cinder-csi-plugin/csi-cinder-driver.yaml
+    - /tmp/kubernetes-cloud-provider-openstack-cinder-sc.yaml
+    register: apply_manifests_res
+
+  - name: "Delete Storage Class file"
+    ansible.builtin.file:
+      path: "/tmp/kubernetes-cloud-provider-openstack-cinder-sc.yaml"
+      state: absent
+
+  - name: "Print result"
+    ansible.builtin.debug:
+      var: apply_manifests_res
+
+...

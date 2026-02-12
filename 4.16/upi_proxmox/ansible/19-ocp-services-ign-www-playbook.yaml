@@ -1,0 +1,57 @@
+---
+- name: "Openshift Install"
+  hosts: "ocp_services"
+  gather_facts: true
+
+  pre_tasks:
+  - name: "Validate required variables"
+    ansible.builtin.assert:
+      that:
+      - "ssh_pub_key_file is defined and ssh_pub_key_file | length > 0"
+      - "pull_secret is defined and pull_secret | length > 0"
+      - "ocp_install_root_dir is defined and ocp_install_root_dir | length > 0"
+      - "ocp_cluster_name is defined and ocp_cluster_name | length > 0"
+
+  - name: "Set variables"
+    ansible.builtin.set_fact:
+      openshift_client_root_url: "https://mirror.openshift.com/pub/openshift-v4/{{ ocp_release_arch }}/clients/ocp/{{ ocp_version }}"
+
+  - name: "Define variables"
+    ansible.builtin.include_tasks:
+      file: ../../ansible/tasks/set_ocp_install_dir.yaml
+
+  tasks:
+
+  - name: "Create openshift install root directory"
+    ansible.builtin.file:
+      path: "/var/www/html/ocp4"
+      state: directory
+      mode: '0755'
+      owner: apache
+      group: apache
+    become: true
+
+  # This is done using shell as the ansible.builtin.copy module copies too much.
+  - name: "Copy Ignition files to the HTTP server"
+    ansible.builtin.shell: |
+      cp {{ openshift_cluster_install_dir }}/bootstrap.ign* /var/www/html/ocp4/
+      cp {{ openshift_cluster_install_dir }}/master.ign* /var/www/html/ocp4/
+      cp {{ openshift_cluster_install_dir }}/worker.ign* /var/www/html/ocp4/
+      chown apache:apache -R /var/www/html/ocp4/
+    become: true
+
+  # - name: "Copy installation"
+  #   ansible.builtin.copy:
+  #     src: "{{ openshift_cluster_install_dir }}/"
+  #     dest: "/var/www/html/ocp4/"
+  #     remote_src: true
+  #     owner: apache
+  #     group: apache
+  #   become: true
+
+  # - name: "Delete the auth folder copied with the previous task"
+  #   ansible.builtin.file:
+  #     path: "/var/www/html/ocp4/auth"
+  #     state: absent
+  #   become: true 
+...

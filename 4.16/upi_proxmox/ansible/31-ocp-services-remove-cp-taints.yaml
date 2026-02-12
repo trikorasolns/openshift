@@ -1,0 +1,19 @@
+---
+- name: "Fix Control Planes"
+  hosts: "ocp_services"
+  gather_facts: true
+
+  pre_tasks:
+  - name: "Define variables"
+    ansible.builtin.include_tasks:
+      file: tasks/set_ocp_install_dir.yaml
+      
+  tasks:
+  - name: "Remove node-role.kubernetes.io/master:NoSchedule"
+    ansible.builtin.shell: |
+      ./oc adm --kubeconfig install_dir/auth/kubeconfig taint nodes {{ hostvars[item].description }} node-role.kubernetes.io/master:NoSchedule-
+    args:
+      chdir: "{{ openshift_install_dir }}"
+    loop: "{{ groups['ocp_control_plane'] }}"
+
+...

@@ -1,0 +1,12 @@
+kubernetes
+jmespath
+ansible
+openshift
+pyyaml
+firewall
+python-openstackclient
+python-octaviaclient
+python-manilaclient
+openstacksdk
+netaddr
+dnspython

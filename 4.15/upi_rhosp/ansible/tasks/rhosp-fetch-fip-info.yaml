@@ -1,0 +1,23 @@
+---
+  - name: "Fetch API floating IP information"
+    openstack.cloud.floating_ip_info:
+      description: "{{ rhosp_fip_api_name }}"
+    register: fip_api_info
+
+  - name: "Fetch Ingress floating IP information"
+    openstack.cloud.floating_ip_info:
+      description: "{{ rhosp_fip_ingress_name }}"
+    register: fip_ingress_info
+
+  - name: "Fetch Bootstrap floating IP information"
+    openstack.cloud.floating_ip_info:
+      description: "{{ rhosp_fip_bootstrap_name }}"
+    register: fip_bootstrap_info
+
+  - name: "Set the external IPs for API and APPS"
+    ansible.builtin.set_fact:
+      openstack_fip_api_address: "{{ fip_api_info.floating_ips[0].floating_ip_address }}"
+      openstack_fip_apps_address: "{{ fip_ingress_info.floating_ips[0].floating_ip_address }}"
+      openstack_fip_bootstrap_address: "{{ fip_bootstrap_info.floating_ips[0].floating_ip_address }}"
+
+...

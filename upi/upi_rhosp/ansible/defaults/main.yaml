@@ -1,0 +1,19 @@
+
+rhosp_lb_public_ports:
+- {name: "api", port: 6443, protocol: "TCP"}
+- {name: "https", port: 443, protocol: "TCP"}
+- {name: "http", port: 80, protocol: "TCP"}
+rhosp_lb_internal_ports:
+- {name: "internal-api-int", port: 22623, protocol: "TCP"}
+- {name: "internal-api", port: 6443, protocol: "TCP"}
+- {name: "internal-https", port: 443, protocol: "TCP"}
+- {name: "internal-http", port: 80, protocol: "TCP"}
+
+ocp_control_plane_count: 3
+ocp_compute_node_count: 3
+
+kubernetes_cloud_provider_openstack_version: v1.35.0
+kubernetes_csi_csi_driver_nfs_version: v4.13.0
+
+# NFS, CEPHFS
+rhosp_manila_share_protcol: NFS

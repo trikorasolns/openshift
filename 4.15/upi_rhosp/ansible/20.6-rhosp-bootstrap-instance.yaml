@@ -1,0 +1,70 @@
+---
+- name: "Collect information"
+  import_playbook: _common_rhosp.yaml
+  when: ocp_cluster_id_tag is not defined
+
+- name: "Deploy Bootstrap Instance"
+  hosts: "localhost"
+  gather_facts: true
+
+  tasks:
+
+  - name: "Template bootstrap ignition Shim"
+    ansible.builtin.template:
+      src: bootstrap-ignition-shim.json.j2
+      dest: "/tmp/bootstrap-{{ metadata_json.infraID }}-shim.ign"
+
+  # - name: 'Create the bootstrap server port'
+  #   openstack.cloud.port:
+  #     name: "{{ metadata_json.infraID }}-bootstrap-port"
+  #     network: "{{ rhosp_network }}"
+  #     security_groups:
+  #     - "{{ infraID }}-master"
+      # allowed_address_pairs:
+      # - ip_address: "{{ os_apiVIP }}"
+
+  # - name: 'Set bootstrap port tag'
+  #   ansible.builtin.shell: |
+  #     openstack port set --tag {{ cluster_id_tag }} {{ metadata_json.infraID }}-bootstrap-port
+  #   register: bootstrap_port_tag_res
+
+  # - name: "Print bootstrap port tag result"
+  #   ansible.builtin.debug:
+  #     msg: 
+
+  - name: 'Set bootstrap auto_ip to false'
+    ansible.builtin.set_fact:
+      bootstrap_auto_ip: false
+    when: openstack_fip_bootstrap_address is not defined
+
+  - name: 'Check if the bootstrap server exists'
+    openstack.cloud.server_info:
+      name: "{{ rhosp_bootstrap_server_name }}"
+    register: rhosp_bootstrap_server_info
+
+  - name: "Print bootstrap server info"
+    ansible.builtin.debug:
+      var: rhosp_bootstrap_server_info
+      verbosity: 2
+
+  - name: 'Create the bootstrap server'
+    openstack.cloud.server:
+      name: "{{ rhosp_bootstrap_server_name }}"
+      image: "{{ rhosp_rhcoreos_image_name }}"
+      flavor: "{{ rhosp_flavor_master }}"
+      userdata: "{{ lookup('file', '/tmp/bootstrap-' + metadata_json.infraID + '-shim.ign') | string }}"
+      network: "{{ rhosp_network }}"
+      floating_ips: "{{ openstack_fip_bootstrap_address | default(omit) }}"
+      auto_ip: "{{ bootstrap_auto_ip | default(omit) }}"
+      # nics:
+      # - port-name: "{{ os_port_bootstrap }}"
+      meta: "{{ ocp_cluster_id_tag }}"
+      # wait: false # due to TypeError: 'NoneType' object is not subscriptable
+    when: rhosp_bootstrap_server_info.servers | length == 0
+
+  - name: "Delete Bootstrap Ignition image"
+    openstack.cloud.image:
+      name: "{{ rhosp_ocp_bootstrap_ign_image_name }}"
+      state: absent
+
+...
