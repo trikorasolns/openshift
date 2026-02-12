@@ -59,4 +59,9 @@
   #     oc delete secret kubernetes-cloud-provider-openstack
   #   register: ocp_cinder_secret
 
+  # https://github.com/kubernetes-csi/csi-driver-nfs/blob/master/docs/install-csi-driver-v4.13.1.md
+  - name: "Remove csi-driver-nfs"
+    ansible.builtin.shell: |
+      curl -skSL https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/v4.13.1/deploy/uninstall-driver.sh | bash -s v4.13.1 --
+    
 ...

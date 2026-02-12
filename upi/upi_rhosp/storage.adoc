@@ -113,14 +113,15 @@ RHOSP Manila
 
 [source,bash]
 ----
-ansible-playbook upi/upi_rhosp/ansible/50-ocp-storage-manila-deploy.yaml \
+ansible-playbook upi/upi_rhosp/ansible/50-ocp-storage-nfs-deploy.yaml \
   -i _local_config/ansible/inventory.yaml \
   -e @_local_config/network.yaml \
   -e @_local_config/${OCP_CLUSTER_NAME}/${OCP_CLUSTER_NAME}.yaml \
   -e @upi/ansible/defaults/main.yaml \
   -e @4.16/ansible/defaults/main.yaml \
   -e @upi/upi_rhosp/ansible/defaults/main.yaml \
-  -e @upi/upi_rhosp/ansible/defaults/ovhcloud.yaml
+  -e @upi/upi_rhosp/ansible/defaults/ovhcloud.yaml \
+  -e rhosp_share_name=${RHOSP_SHARE_NAME}
 ----
 
 To test the configuration execute the following configuration that will deploy 

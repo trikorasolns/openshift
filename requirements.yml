@@ -3,4 +3,5 @@ collections:
   - name: kubernetes.core
     version: 5.0.0
   - name: openstack.cloud
+    version: 2.5.0
 
