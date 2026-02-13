@@ -1,0 +1,91 @@
+---
+- name: "Check if the Share Network exists"
+  ansible.builtin.command: |
+    openstack share network show {{ rhosp_share_manage_network_name }} -c id -c name -c status -f json
+  register: rhosp_share_manage_network_info_res
+
+- name: "Fetch the share network information"
+  ansible.builtin.set_fact:
+    rhosp_share_manage_network_info: "{{ rhosp_share_manage_network_info_res.stdout | from_json }}"
+  when: "'No sharenetwork with a name or ID of' not in rhosp_share_manage_network_info_res.stdout"
+
+- name: "Create the share network if it doesn't exist"
+  ansible.builtin.include_tasks: deploy_share_network.yml
+  when: "'No sharenetwork with a name or ID of' in rhosp_share_manage_network_info_res.stdout"
+
+- name: "Check if share exists"
+  ansible.builtin.command: |
+    openstack share show {{ rhosp_share_manage_name }} -f json
+  register: rhosp_share_manage_share_show_res
+  failed_when: false
+  changed_when: false
+
+- name: "Create the NFS share"
+  ansible.builtin.command: |
+    openstack share create \
+      --os-region-name {{ rhosp_os_region }} \
+      --share-type {{ ovhc_rhosp_share_manage_type }} \
+      --share-network {{ rhosp_share_manage_name }} \
+      --name {{ rhosp_share_manage_name }} \
+      {{ rhosp_share_manage_protocol }} {{ rhosp_share_manage_size }} \
+      -f json
+  register: rhosp_share_manage_share_create_res
+  when: rhosp_share_manage_share_show_res.rc != 0
+
+- name: "Authorize VMs by granting access to the share using the VM's private IP"
+  ansible.builtin.command: |
+    openstack share access create \
+      --os-region-name {{ rhosp_os_region }} \
+      {{ rhosp_share_manage_name }} \
+      ip {{ rhosp_share_manage_instance_item }}
+  loop: rhosp_share_manage_instances
+  loop_control:
+    loop_var: rhosp_share_manage_instance_item
+
+- name: "Get the NFS export location"
+  ansible.builtin.command: |
+    openstack share export location list \
+      --os-region-name <REGION_NAME> \
+      {{ rhosp_share_manage_name }} \
+      -f json
+  register: rhosp_share_manage_export_location_info_res
+
+- name: "Extract NFS Path"
+  ansible.builtin.set_fact:
+    rhosp_share_manage_nfs_path_entry: "{{ (rhosp_share_manage_export_location_info_res.stdout | from_json).path }}"
+
+# - name: "Get share details"
+#   ansible.builtin.command: |
+#     openstack share show {{ rhosp_share_manage_name }} -f json
+#   register: rhosp_share_manage_info_res
+
+# - name: "Print share information"
+#   ansible.builtin.debug:
+#     msg: 
+#     # - "rhosp_share_manage_info_res: {{ rhosp_share_manage_info_res.stdout | from_json }}"
+#     - "rhosp_share_manage_info_res: {{ (rhosp_share_manage_info_res.stdout | from_json).export_locations }}"
+#     - "rhosp_share_manage_info_res: {{ (rhosp_share_manage_info_res.stdout | from_json).export_locations | regex_search('\npath.*\n')}}"
+#     - "rhosp_share_manage_info_res: {{ (rhosp_share_manage_info_res.stdout | from_json).export_locations | split('\n') }}"
+
+# - name: "Extract NFS Path"
+#   ansible.builtin.set_fact:
+#     rhosp_share_manage_nfs_path_entry: "{{ ((rhosp_share_manage_info_res.stdout | from_json).export_locations | regex_search('path.*\n'))[7:-1] }}"
+
+- name: "Print share information"
+  ansible.builtin.debug:
+    var: rhosp_share_manage_nfs_path_entry
+
+- name: "Extract NFS Path"
+  ansible.builtin.set_fact:
+    rhosp_share_manage_nfs_server: "{{ (rhosp_share_manage_nfs_path_entry | split(':'))[0] }}"
+    rhosp_share_manage_nfs_path: "{{ (rhosp_share_manage_nfs_path_entry | split(':'))[1] }}"
+    ocp_nfs_storage_class_name: "nfs-csi-{{ rhosp_share_manage_name }}"
+
+- name: "Print share information"
+  ansible.builtin.debug:
+    msg:
+    - "rhosp_share_manage_nfs_server: {{ rhosp_share_manage_nfs_server }}"
+    - "rhosp_share_manage_nfs_path: {{ rhosp_share_manage_nfs_path }}"
+    - "ocp_nfs_storage_class_name: {{ ocp_nfs_storage_class_name }}"
+
+...

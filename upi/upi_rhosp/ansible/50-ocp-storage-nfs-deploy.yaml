@@ -12,78 +12,135 @@
     ansible.builtin.set_fact:
       rhosp_os_region: "{{ lookup('ansible.builtin.env', 'OS_REGION_NAME') }}"
       rhosp_os_password: "{{ lookup('ansible.builtin.env', 'OS_PASSWORD') }}"
+      rhosp_server_ips: []
   # - name: "Get share type details"
   #   openstack.cloud.share_type_info:
   #     name: "{{ nfs_share_name }}"
   #   register: rhosp_share_info
 
-  # https://help.ovhcloud.com/csm/es-es-public-cloud-storage-file-storage-service-getting-started?id=kb_article_view&sysparm_article=KB0072903
+  - name: "Get all the compute node servers"
+    openstack.cloud.server_info:
+      name: "{{ rhosp_compute_node_server_prefix }}*"
+    register: rhosp_computenode_server_info
+
+  # - name: "Print server information"
+  #   ansible.builtin.debug:
+  #     var: item
+  #   loop:
+  #   - "{{ rhosp_computenode_server_info.servers[0].addresses[rhosp_network] }}"
+  #   - "{{ rhosp_computenode_server_info.servers[0].addresses[rhosp_network][0] }}"
+  #   - "{{ rhosp_computenode_server_info.servers[0].addresses[rhosp_network][0].addr }}"
+  
+  - name: "Update array with compute node IPs"
+    ansible.builtin.set_fact:
+      rhosp_server_ips: "{{ rhosp_server_ips + [rhosp_server_info_item.addresses[rhosp_network][0].addr] }}"
+    loop: "{{ rhosp_computenode_server_info.servers }}"
+    loop_control:
+      loop_var: rhosp_server_info_item
+
+  # - name: "Print ip array"
+  #   ansible.builtin.debug:
+  #     var: rhosp_server_ips
+
+  - name: "Get all the control plane servers"
+    openstack.cloud.server_info:
+      name: "{{ rhosp_control_plane_server_prefix }}*"
+    register: rhosp_controlplane_server_info
+
+  - name: "Update array with control plane IPs"
+    ansible.builtin.set_fact:
+      rhosp_server_ips: "{{ rhosp_server_ips + [rhosp_server_info_item.addresses[rhosp_network][0].addr] }}"
+    loop: "{{ rhosp_controlplane_server_info.servers }}"
+    loop_control:
+      loop_var: rhosp_server_info_item
+
+  - name: "Print ip array"
+    ansible.builtin.debug:
+      var: rhosp_server_ips
+
+  # # https://help.ovhcloud.com/csm/es-es-public-cloud-storage-file-storage-service-getting-started?id=kb_article_view&sysparm_article=KB0072903
+
+  - ansible.builtin.include_role:
+      name: 'rhosp_share_manage'
+    vars:
+      rhosp_share_manage_name: "{{ rhosp_share_item.name }}"
+      rhosp_share_manage_network_name: "{{ rhosp_share_item.network }}"
+      rhosp_share_manage_neutron_network: "{{ rhosp_network }}"
+      rhosp_share_manage_protocol: "{{ rhosp_share_item.protocol }}"
+      rhosp_share_manage_region: "{{ rhosp_os_region }}"
+      rhosp_share_manage_size: "{{ rhosp_share_item.size }}"
+      rhosp_share_manage_type: "{{ rhosp_share_item.type }}"
+      rhosp_share_manage_instance_list: "{{ rhosp_server_ips }}"
+      state: present
+    loop: "{{ rhosp_share }}"
+    loop_control:
+      loop_var: rhosp_share_item
 
   # openstack network show {{ rhosp_network }} -f json
-  - name: "Fetch the ID of the openshift private network"
-    openstack.cloud.networks_info:
-      name:  "{{ rhosp_network }}"
-    register: rhosp_ocp_network
+  # - name: "Fetch the ID of the openshift private network"
+  #   openstack.cloud.networks_info:
+  #     name:  "{{ rhosp_network }}"
+  #   register: rhosp_ocp_network
 
-  - name: "Create a share network linked to private network"
-    ansible.builtin.command: |
-      openstack share network create \
-        --os-region-name {{ rhosp_os_region }} \
-        --name {{ rhosp_share_name }} \
-        --neutron-net-id {{ rhosp_ocp_network.networks[0].id }} \
-        --neutron-subnet-id {{ rhosp_ocp_network.networks[0].subnet_ids[0] }} \
-        -f json
-    register: rhosp_share_net_create_res
+  # - name: "Create a share network linked to private network"
+  #   ansible.builtin.command: |
+  #     openstack share network create \
+  #       --os-region-name {{ rhosp_os_region }} \
+  #       --name {{ rhosp_share_name }} \
+  #       --neutron-net-id {{ rhosp_ocp_network.networks[0].id }} \
+  #       --neutron-subnet-id {{ rhosp_ocp_network.networks[0].subnet_ids[0] }} \
+  #       -f json
+  #   register: rhosp_share_net_create_res
 
-  # - name: "Parse share network create output"
+  # # - name: "Parse share network create output"
+  # #   ansible.builtin.set_fact:
+  # #     rhosp_share_net_create_output:  "{{ rhosp_share_net_create_res.stdout | from_json }}"
+
+  # - name: "Create the NFS share"
+  #   ansible.builtin.command: |
+  #     openstack share create \
+  #       --os-region-name {{ rhosp_os_region }} \
+  #       --share-type {{ ovhc_rhosp_share_type }} \
+  #       --share-network {{ rhosp_share_name }} \
+  #       --name {{ rhosp_share_name }} \
+  #       NFS 150
+  #   register: rhosp_share_info_res
+
+  # # Authorize VMs by grantingt access to the share using the VM’s private IP (e.g., 10.1.0.123):
+  #   # openstack share access create \
+  #   #   --os-region-name <REGION_NAME> \
+  #   #   <my-first-share-name> \
+  #   #   ip 10.1.0.123
+  #   # loop for each server add access
+  # # Get the NFS export location:
+  #   # openstack share export location list --os-region-name <REGION_NAME> <my-first-share-name>
+
+  # - name: "Get share details"
+  #   ansible.builtin.command: |
+  #     openstack share show {{ rhosp_share_name }} -f json
+  #   register: rhosp_share_info_res
+
+  # # - name: "Print share information"
+  # #   ansible.builtin.debug:
+  # #     msg: 
+  # #     # - "rhosp_share_info_res: {{ rhosp_share_info_res.stdout | from_json }}"
+  # #     - "rhosp_share_info_res: {{ (rhosp_share_info_res.stdout | from_json).export_locations }}"
+  # #     - "rhosp_share_info_res: {{ (rhosp_share_info_res.stdout | from_json).export_locations | regex_search('\npath.*\n')}}"
+  # #     - "rhosp_share_info_res: {{ (rhosp_share_info_res.stdout | from_json).export_locations | split('\n') }}"
+
+  # - name: "Extract NFS Path"
   #   ansible.builtin.set_fact:
-  #     rhosp_share_net_create_output:  "{{ rhosp_share_net_create_res.stdout | from_json }}"
-
-  - name: "Create the NFS share"
-    ansible.builtin.command: |
-      openstack share create \
-        --os-region-name {{ rhosp_os_region }} \
-        --share-type {{ ovhc_rhosp_share_type }} \
-        --share-network {{ rhosp_share_name }} \
-        --name {{ rhosp_share_name }} \
-        NFS 150
-    register: rhosp_share_info_res
-
-  # Authorize VMs by grantingt access to the share using the VM’s private IP (e.g., 10.1.0.123):
-    # openstack share access create \
-    #   --os-region-name <REGION_NAME> \
-    #   <my-first-share-name> \
-    #   ip 10.1.0.123
-    # loop for each server add access
-  # Get the NFS export location:
-    # openstack share export location list --os-region-name <REGION_NAME> <my-first-share-name>
-
-  - name: "Get share details"
-    ansible.builtin.command: |
-      openstack share show {{ rhosp_share_name }} -f json
-    register: rhosp_share_info_res
+  #     rhosp_share_nfs_path_entry: "{{ ((rhosp_share_info_res.stdout | from_json).export_locations | regex_search('path.*\n'))[7:-1] }}"
 
   # - name: "Print share information"
   #   ansible.builtin.debug:
-  #     msg: 
-  #     # - "rhosp_share_info_res: {{ rhosp_share_info_res.stdout | from_json }}"
-  #     - "rhosp_share_info_res: {{ (rhosp_share_info_res.stdout | from_json).export_locations }}"
-  #     - "rhosp_share_info_res: {{ (rhosp_share_info_res.stdout | from_json).export_locations | regex_search('\npath.*\n')}}"
-  #     - "rhosp_share_info_res: {{ (rhosp_share_info_res.stdout | from_json).export_locations | split('\n') }}"
+  #     var: rhosp_share_nfs_path
 
-  - name: "Extract NFS Path"
-    ansible.builtin.set_fact:
-      rhosp_share_nfs_path_entry: "{{ ((rhosp_share_info_res.stdout | from_json).export_locations | regex_search('path.*\n'))[7:-1] }}"
-
-  - name: "Print share information"
-    ansible.builtin.debug:
-      var: rhosp_share_nfs_path
-
-  - name: "Extract NFS Path"
-    ansible.builtin.set_fact:
-      rhosp_share_nfs_server: "{{ (rhosp_share_nfs_path_entry | split(':'))[0] }}"
-      rhosp_share_nfs_path: "{{ (rhosp_share_nfs_path_entry | split(':'))[1] }}"
-      ocp_nfs_storage_class_name: "nfs-csi-{{ rhosp_share_name }}"
+  # - name: "Extract NFS Path"
+  #   ansible.builtin.set_fact:
+  #     rhosp_share_nfs_server: "{{ (rhosp_share_nfs_path_entry | split(':'))[0] }}"
+  #     rhosp_share_nfs_path: "{{ (rhosp_share_nfs_path_entry | split(':'))[1] }}"
+  #     ocp_nfs_storage_class_name: "nfs-csi-{{ rhosp_share_name }}"
 
   - name: "Print share information"
     ansible.builtin.debug:

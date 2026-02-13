@@ -1,0 +1,13 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ ocp_nfs_storage_class_name }}
+provisioner: nfs.csi.k8s.io
+parameters:
+  server: {{ rhosp_share_nfs_server }}  # NFS server address
+  share: {{ rhosp_share_nfs_path }}     # NFS share path
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+mountOptions:
+  - nfsvers=4.1

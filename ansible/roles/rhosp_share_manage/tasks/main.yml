@@ -1,0 +1,35 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for ansible/roles/rhosp_share
+- name: "Validate the state value"
+  ansible.builtin.assert:
+    that: state == 'absent' or state == 'present'
+    fail_msg: "state must be either 'absent' or 'present'"
+
+- name: "Print protocol"
+  ansible.builtin.debug:
+    var: rhosp_share_manage_protocol
+
+- name: "Validate required variables"
+  ansible.builtin.assert:
+    that: 
+    - (rhosp_share_manage_name is defined) and (rhosp_share_manage_name | length > 0)
+    - (rhosp_share_manage_network_name is defined) and (rhosp_share_manage_network_name | length > 0)
+    - (rhosp_share_manage_protocol is defined) and (rhosp_share_manage_protocol | length > 0)
+    - (rhosp_share_manage_region is defined) and (rhosp_share_manage_region | length > 0)
+    - (rhosp_share_manage_type is defined) and (rhosp_share_manage_type | length > 0)
+    - (rhosp_share_manage_instance_list is defined)
+    fail_msg: 
+    - "'rhosp_share_manage_name' must be defined with the name of the Share to be created"
+    - "'rhosp_share_manage_network_name' must be defined with the name of the Share network network to use. Check the list of networks with 'openstack share network list'"
+    - "'rhosp_share_manage_protocol' must be defined with the share protocol to use. Check the list of enabled protocols with the OpenStack provider."
+    - "'rhosp_share_manage_region' must be defined with the Region"
+    - "'rhosp_share_manage_type' must be defined with an available Share Type (e.g. 'standard-1az'). Check the list of Share Types with 'openstack share type list'"
+    - "'rhosp_share_manage_instance_list' must be provided with a list of instance private IPs to be authorized to use the share. Can be an empty list ([])."
+
+- ansible.builtin.include_tasks: remove.yml
+  when: state == 'absent'
+
+- ansible.builtin.include_tasks: deploy.yml
+  when: state == 'present'
+...

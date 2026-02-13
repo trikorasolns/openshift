@@ -35,3 +35,86 @@ User-provisioned infrastructure
 [.lead]
 Currently this project is being tested against OCP version *4.16*.
 
+== Deployment
+
+[.lead]
+The different sections linked by this document describe the installation 
+ process for OCP 4.16.x on different platforms.
+
+[#collect-information]
+== Collect information
+
+Collect all the information required for the deployment.
+
+[source,bash]
+----
+RH_CLUSTER_PULL_SECRET='{"auths":{"cloud.openshift.com":...'<1>
+SSH_PUB_KEY_FILE=~/.ssh/id_rsa_somefile.pub<2>
+----
+<1> RedHat Openshift cloud pull secret.
+ Get a Red Hat pull secret by going to https://cloud.redhat.com/.
+ Select the _Access the Console_ link and login to the link:https://console.redhat.com/[Hybrid Cloud console].
+ Open the _Services_ dropdown and navigate to _Platform > Red Hat OpenShift_. 
+ On the _OpenShift > Overview_ page navigate to _Cluster List_, using the left menu, and press _Create Cluster_. 
+ Under the cluster type tab select _Local_ and press the _Copy pull secret_.
+<2> SSH public key used to access the cluster hosts
+
+== UPI
+
+Considerations regarding DNS: https://docs.redhat.com/en/documentation/openshift_container_platform/4.16/html/installing_on_any_platform/installing-platform-agnostic#installation-dns-user-infra_installing-platform-agnostic
+
+=== Select platform
+
+The following platforms are available:
+
+* link:upi_proxmox/[OCP UPI Installation on Proxmox]
+* link:upi_rhosp/[OCP Installation on UPI RHOSP]
+
+== Installation Process
+
+* UPI under a Proxmox Cluster
+* UPI under RedHat OpenStack infrastrcture
+
+=== Follow up the deployment
+
+Once the deployment started it can be checked by using the following commands.
+
+Check when the nodes are created.
+
+[source,bash]
+----
+./oc --kubeconfig ocp/auth/kubeconfig get nodes -w
+----
+
+Wait for the bootstrap operation to finish. From the openshift root folder on 
+ the _ocp_services_ host execute the following command.
+
+[source,bash]
+----
+./openshift-install --dir ocp/ wait-for bootstrap-complete --log-level=debug
+----
+
+Check for what's missing for the cluster to be stable.
+
+[source,bash]
+----
+./oc --kubeconfig ocp/auth/kubeconfig  adm wait-for-stable-cluster --minimum-stable-period=5s
+----
+
+== Post installation steps
+
+Get the authentication.
+
+[source,bash]
+----
+ansible-playbook ocp/ansible/50-ocp-services-get-ocp-auth-playbook.yaml \
+  -e @ocp/ansible/defaults/main.yaml \
+  -e @_local_config/${OCP_CLUSTER_NAME}/${OCP_CLUSTER_NAME}.yaml
+----
+
+=== Remove worker from Control Plane nodes
+
+[source,bash]
+----
+oc patch scheduler cluster --type merge -p '{"spec":{"mastersSchedulable":false}}'
+----

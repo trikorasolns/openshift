@@ -1,0 +1,35 @@
+---
+# openstack network show {{ rhosp_network }} -f json
+- name: "Fetch the ID of the Neutron network to associate the share with"
+  openstack.cloud.networks_info:
+    name:  "{{ rhosp_share_neutron_network }}"
+  register: rhosp_share_neutron_network_info
+
+# - name: "Create a share network linked to private network"
+#   ansible.builtin.command: |
+#     openstack share network create \
+#       --os-region-name {{ rhosp_os_region }} \
+#       --name {{ rhosp_share_name }} \
+#       --neutron-net-id {{ rhosp_share_neutron_network_info.networks[0].id }} \
+#       --neutron-subnet-id {{ rhosp_share_neutron_network_info.networks[0].subnet_ids[0] }} \
+#       -f json
+#   register: rhosp_share_net_create_res
+
+# - name: "Parse share network create output"
+#   ansible.builtin.set_fact:
+#     rhosp_share_net_create_output:  "{{ rhosp_share_net_create_res.stdout | from_json }}"
+
+- name: "Create a share network linked to private network"
+  ansible.builtin.command: |
+    openstack share network create \
+      --os-region-name {{ rhosp_os_region }} \
+      --name {{ rhosp_share_name }} \
+      --neutron-net-id {{ rhosp_share_neutron_network_info.networks[0].id }} \
+      --neutron-subnet-id {{ rhosp_share_neutron_network_info.networks[0].subnet_ids[0] }} \
+      -f json
+  register: rhosp_share_net_create_res
+
+- name: "Fetch the share network information"
+  ansible.builtin.set_fact:
+    rhosp_share_network_info: "{{ rhosp_share_net_create_res.stdout | from_json }}"
+...
