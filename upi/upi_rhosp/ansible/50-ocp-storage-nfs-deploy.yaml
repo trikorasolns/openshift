@@ -135,37 +135,48 @@
   # - name: "Print share information"
   #   ansible.builtin.debug:
   #     var: rhosp_share_nfs_path
-
-  # - name: "Extract NFS Path"
-  #   ansible.builtin.set_fact:
-  #     rhosp_share_nfs_server: "{{ (rhosp_share_nfs_path_entry | split(':'))[0] }}"
-  #     rhosp_share_nfs_path: "{{ (rhosp_share_nfs_path_entry | split(':'))[1] }}"
-  #     ocp_nfs_storage_class_name: "nfs-csi-{{ rhosp_share_name }}"
-
-  - name: "Print share information"
+  post_tasks:
+  - name: "Print OUT share information"
     ansible.builtin.debug:
       msg:
-      - "rhosp_share_nfs_server: {{ rhosp_share_nfs_server }}"
-      - "rhosp_share_nfs_path: {{ rhosp_share_nfs_path }}"
-      - "ocp_nfs_storage_class_name: {{ ocp_nfs_storage_class_name }}"
+      - "rhosp_share_manage_nfs_server: {{ rhosp_share_manage_nfs_server }}"
+      - "rhosp_share_manage_nfs_path: {{ rhosp_share_manage_nfs_path }}"
+      # - "ocp_nfs_storage_class_name: {{ ocp_nfs_storage_class_name }}"
+
+  - name: "Extract NFS Path"
+    ansible.builtin.set_fact:
+      global_rhosp_share_nfs_server: "{{ rhosp_share_manage_nfs_server }}"
+      global_rhosp_share_nfs_path: "{{ rhosp_share_manage_nfs_path }}"
+  #     ocp_nfs_storage_class_name: "nfs-csi-{{ rhosp_share_name }}"
+      # delegate_to: localhost
+      # delegate_facts: True
+
+  - name: "Print OUT logal variables"
+    ansible.builtin.debug:
+      msg:
+      - "global_rhosp_share_nfs_server: {{ global_rhosp_share_nfs_server }}"
+      - "global_rhosp_share_nfs_path: {{ global_rhosp_share_nfs_path }}"
+      # - "ocp_nfs_storage_class_name: {{ ocp_nfs_storage_class_name }}"
 
 - name: "Deploy RHOSP Manila as storage Backend"
   hosts: "{{ ocp_bastion | default('ocp_bastion') | default('localhost') }}"
   gather_facts: true
 
   pre_tasks:
-  - name: "Fetch share information from openstack host"
+  - name: "Fetch NFS share information"
     ansible.builtin.set_fact:
-      rhosp_share_nfs_server: "{{ hostvars['localhost']['rhosp_share_nfs_server'] }}"
-      rhosp_share_nfs_path: "{{ hostvars['localhost']['rhosp_share_nfs_path'] }}"
-      ocp_nfs_storage_class_name: "{{ hostvars['localhost']['ocp_nfs_storage_class_name'] }}"
+      rhosp_share_nfs_server: "{{ hostvars['localhost']['rhosp_share_manage_nfs_server'] }}"
+      rhosp_share_nfs_path: "{{ hostvars['localhost']['rhosp_share_manage_nfs_path'] }}"
+      # ocp_nfs_storage_class_name: "{{ hostvars['localhost']['ocp_nfs_storage_class_name'] }}"
+      # delegate_to: localhost
+      # delegate_facts: True
 
-  - name: "Print share information"
+  - name: "Print IN share information"
     ansible.builtin.debug:
       msg:
       - "rhosp_share_nfs_server: {{ rhosp_share_nfs_server }}"
       - "rhosp_share_nfs_path: {{ rhosp_share_nfs_path }}"
-      - "ocp_nfs_storage_class_name: {{ ocp_nfs_storage_class_name }}"
+      # - "ocp_nfs_storage_class_name: {{ ocp_nfs_storage_class_name }}"
 
   - name: "Get RHOSP information from the environment"
     ansible.builtin.set_fact:

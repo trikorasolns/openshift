@@ -120,8 +120,7 @@ ansible-playbook upi/upi_rhosp/ansible/50-ocp-storage-nfs-deploy.yaml \
   -e @upi/ansible/defaults/main.yaml \
   -e @4.16/ansible/defaults/main.yaml \
   -e @upi/upi_rhosp/ansible/defaults/main.yaml \
-  -e @upi/upi_rhosp/ansible/defaults/ovhcloud.yaml \
-  -e rhosp_share_name=${RHOSP_SHARE_NAME}
+  -e @upi/upi_rhosp/ansible/defaults/ovhcloud.yaml
 ----
 
 To test the configuration execute the following configuration that will deploy 
