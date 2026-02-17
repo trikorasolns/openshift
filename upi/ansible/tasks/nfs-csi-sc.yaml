@@ -1,0 +1,16 @@
+# Requires:
+# * ocp_nfs_storage_class_name: 
+# * rhosp_share_nfs_server: 
+# * rhosp_share_nfs_path
+---
+- name: "Template the Storage Class - {{ ocp_nfs_storage_class_name }}"
+  ansible.builtin.template:
+    src: "nfs-csi.yaml.j2"
+    dest: "/tmp/{{ ocp_nfs_storage_class_name }}.yaml"
+    mode: 0644
+
+- name: "Create the Storage Class"
+  ansible.builtin.command: |
+    oc apply -f "/tmp/{{ ocp_nfs_storage_class_name }}.yaml"
+  register: ocp_create_storage_class_res
+...

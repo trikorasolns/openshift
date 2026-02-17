@@ -1,6 +1,6 @@
 ---
 - name: "Collect information"
-  import_playbook: ../../ansible/_common_ocp.yaml
+  import_playbook: ../../ansible/00-fetch-ocp-installation-info-playbook.yaml
   
 # - name: "Read installation info from openshift installation"
 #   hosts: "{{ ocp_bastion | default('localhost') }}"

@@ -75,6 +75,15 @@
     loop: "{{ rhosp_share }}"
     loop_control:
       loop_var: rhosp_share_item
+    register: deploy_shares_on_rhosp
+
+  - name: "Print deploy_shares_on_rhosp"
+    ansible.builtin.debug:
+      var: deploy_shares_on_rhosp
+
+  - name: "Pause until you can verify updates to an application were successful"
+    ansible.builtin.pause:
+
 
   # openstack network show {{ rhosp_network }} -f json
   # - name: "Fetch the ID of the openshift private network"
@@ -192,6 +201,7 @@
   - name: "Print worker nodes"
     ansible.builtin.set_fact:
       worker_node_list: "{{ ocp_worker_nodes_res.stdout | from_json }}"
+      ocp_nfs_storage_class_name: "nfs-csi-{{ rhosp_share_manage_name }}"
 
   - name: "Print worker nodes"
     ansible.builtin.debug:
