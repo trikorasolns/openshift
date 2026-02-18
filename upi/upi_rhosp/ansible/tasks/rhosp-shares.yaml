@@ -1,0 +1,33 @@
+# Requires:
+# * 
+---
+- ansible.builtin.include_role:
+    name: 'rhosp_share_manage'
+  vars:
+    rhosp_share_manage_name: "{{ rhosp_share_item.name }}"
+    rhosp_share_manage_network_name: "{{ rhosp_share_item.network }}"
+    rhosp_share_manage_neutron_network: "{{ rhosp_network }}"
+    rhosp_share_manage_protocol: "{{ rhosp_share_item.protocol }}"
+    rhosp_share_manage_region: "{{ rhosp_os_region }}"
+    rhosp_share_manage_size: "{{ rhosp_share_item.size }}"
+    rhosp_share_manage_type: "{{ rhosp_share_item.type }}"
+    rhosp_share_manage_instance_list: "{{ rhosp_server_ips }}"
+    state: present
+  # loop: "{{ rhosp_share }}"
+  # loop_control:
+  #   loop_var: rhosp_share_item
+  register: deploy_shares_on_rhosp
+
+- name: "Print deploy_shares_on_rhosp"
+  ansible.builtin.debug:
+    var: deploy_shares_on_rhosp
+
+- name: "Collect the NFS Share information"
+  ansible.builtin.set_fact:
+    nfs_share_urls: "{{ nfs_share_urls | default([]) | union([{'share_name': rhosp_share_item.name, 'nfs_server': rhosp_share_manage_nfs_server, 'nfs_path': rhosp_share_manage_nfs_path}]) }}"
+
+- name: "Print OUT: nfs_share_urls"
+  ansible.builtin.debug:
+    var: nfs_share_urls
+
+...

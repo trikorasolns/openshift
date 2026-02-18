@@ -1,5 +1,5 @@
 ---
-- name: "Read installation info from openshift installation (without Ignition files)"
+- name: "Read installation info from openshift installation (with Ignition files)"
   hosts: "{{ ocp_bastion | default('ocp_bastion') | default('localhost') }}"
   gather_facts: true
 
@@ -58,30 +58,30 @@
       ansible.builtin.set_fact:
         metadata_json: "{{ metadata_json_slurp.content | b64decode }}"
 
-    # - name: "Fetch all Ignition files"
-    #   ansible.builtin.fetch:
-    #     src: "{{ openshift_cluster_install_dir }}/{{ item }}.ign"
-    #     dest: "/tmp/{{ item }}-{{ metadata_json.infraID }}.ign"
-    #     flat: true
-    #   loop:
-    #   - bootstrap
-    #   - master
-    #   - worker
+    - name: "Fetch all Ignition files"
+      ansible.builtin.fetch:
+        src: "{{ openshift_cluster_install_dir }}/{{ item }}.ign"
+        dest: "/tmp/{{ item }}-{{ metadata_json.infraID }}.ign"
+        flat: true
+      loop:
+      - bootstrap
+      - master
+      - worker
 
-    # - name: "Read bootstrap Ignition file signature"
-    #   ansible.builtin.slurp:
-    #     src: "{{ openshift_cluster_install_dir }}/bootstrap.ign.sig"
-    #   register: bootstrap_sig_slurp
+    - name: "Read bootstrap Ignition file signature"
+      ansible.builtin.slurp:
+        src: "{{ openshift_cluster_install_dir }}/bootstrap.ign.sig"
+      register: bootstrap_sig_slurp
 
-    # - name: "Read master Ignition file signature"
-    #   ansible.builtin.slurp:
-    #     src: "{{ openshift_cluster_install_dir }}/master.ign.sig"
-    #   register: master_sig_slurp
+    - name: "Read master Ignition file signature"
+      ansible.builtin.slurp:
+        src: "{{ openshift_cluster_install_dir }}/master.ign.sig"
+      register: master_sig_slurp
 
-    # - name: "Read worker Ignition file signature"
-    #   ansible.builtin.slurp:
-    #     src: "{{ openshift_cluster_install_dir }}/worker.ign.sig"
-    #   register: worker_sig_slurp
+    - name: "Read worker Ignition file signature"
+      ansible.builtin.slurp:
+        src: "{{ openshift_cluster_install_dir }}/worker.ign.sig"
+      register: worker_sig_slurp
 
 
   post_tasks:
@@ -99,9 +99,9 @@
 
     - name: "Set CoreOS Image Location under localhost"
       ansible.builtin.set_fact:
-        # global_bootstrap_hash: "{{ bootstrap_sig_slurp.content | b64decode }}"
-        # global_master_hash: "{{ master_sig_slurp.content | b64decode }}"
-        # global_worker_hash: "{{ worker_sig_slurp.content | b64decode }}"
+        global_bootstrap_hash: "{{ bootstrap_sig_slurp.content | b64decode }}"
+        global_master_hash: "{{ master_sig_slurp.content | b64decode }}"
+        global_worker_hash: "{{ worker_sig_slurp.content | b64decode }}"
         global_metadata_json: "{{ metadata_json }}"
       delegate_to: localhost
       delegate_facts: True
@@ -115,9 +115,9 @@
     ansible.builtin.set_fact:
       coreos_image_location: "{{ hostvars['localhost']['global_coreos_image_location'] }}"
       coreos_image_filename: "{{ hostvars['localhost']['global_coreos_image_location'] | basename}}"
-      # bootstrap_hash: "{{ hostvars['localhost']['global_bootstrap_hash'] }}"
-      # master_hash: "{{ hostvars['localhost']['global_master_hash']}}"
-      # worker_hash: "{{ hostvars['localhost']['global_worker_hash'] }}"
+      bootstrap_hash: "{{ hostvars['localhost']['global_bootstrap_hash'] }}"
+      master_hash: "{{ hostvars['localhost']['global_master_hash']}}"
+      worker_hash: "{{ hostvars['localhost']['global_worker_hash'] }}"
       metadata_json: "{{ hostvars['localhost']['global_metadata_json'] }}"
     delegate_to: localhost
   

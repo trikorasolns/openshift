@@ -1,7 +1,6 @@
 ---
 - name: "Collect information"
   import_playbook: _common_rhosp.yaml
-  # when: ocp_cluster_id_tag is not defined
 
 - name: "Get OpenStack share information"
   hosts: "localhost"
@@ -13,23 +12,12 @@
       rhosp_os_region: "{{ lookup('ansible.builtin.env', 'OS_REGION_NAME') }}"
       rhosp_os_password: "{{ lookup('ansible.builtin.env', 'OS_PASSWORD') }}"
       rhosp_server_ips: []
-  # - name: "Get share type details"
-  #   openstack.cloud.share_type_info:
-  #     name: "{{ nfs_share_name }}"
-  #   register: rhosp_share_info
+      nfs_share_urls: []
 
   - name: "Get all the compute node servers"
     openstack.cloud.server_info:
       name: "{{ rhosp_compute_node_server_prefix }}*"
     register: rhosp_computenode_server_info
-
-  # - name: "Print server information"
-  #   ansible.builtin.debug:
-  #     var: item
-  #   loop:
-  #   - "{{ rhosp_computenode_server_info.servers[0].addresses[rhosp_network] }}"
-  #   - "{{ rhosp_computenode_server_info.servers[0].addresses[rhosp_network][0] }}"
-  #   - "{{ rhosp_computenode_server_info.servers[0].addresses[rhosp_network][0].addr }}"
   
   - name: "Update array with compute node IPs"
     ansible.builtin.set_fact:
@@ -37,10 +25,6 @@
     loop: "{{ rhosp_computenode_server_info.servers }}"
     loop_control:
       loop_var: rhosp_server_info_item
-
-  # - name: "Print ip array"
-  #   ansible.builtin.debug:
-  #     var: rhosp_server_ips
 
   - name: "Get all the control plane servers"
     openstack.cloud.server_info:
@@ -58,10 +42,8 @@
     ansible.builtin.debug:
       var: rhosp_server_ips
 
-  # # https://help.ovhcloud.com/csm/es-es-public-cloud-storage-file-storage-service-getting-started?id=kb_article_view&sysparm_article=KB0072903
-
-  - ansible.builtin.include_role:
-      name: 'rhosp_share_manage'
+  - ansible.builtin.include_tasks: 
+      file: tasks/rhosp-shares.yaml
     vars:
       rhosp_share_manage_name: "{{ rhosp_share_item.name }}"
       rhosp_share_manage_network_name: "{{ rhosp_share_item.network }}"
@@ -75,87 +57,30 @@
     loop: "{{ rhosp_share }}"
     loop_control:
       loop_var: rhosp_share_item
-    register: deploy_shares_on_rhosp
+    register: deploy_shares_task
 
   - name: "Print deploy_shares_on_rhosp"
     ansible.builtin.debug:
-      var: deploy_shares_on_rhosp
+      var: deploy_shares_task
 
-  - name: "Pause until you can verify updates to an application were successful"
-    ansible.builtin.pause:
+  - name: "Print resulting nfs_share_urls"
+    ansible.builtin.debug:
+      var: nfs_share_urls
 
-
-  # openstack network show {{ rhosp_network }} -f json
-  # - name: "Fetch the ID of the openshift private network"
-  #   openstack.cloud.networks_info:
-  #     name:  "{{ rhosp_network }}"
-  #   register: rhosp_ocp_network
-
-  # - name: "Create a share network linked to private network"
-  #   ansible.builtin.command: |
-  #     openstack share network create \
-  #       --os-region-name {{ rhosp_os_region }} \
-  #       --name {{ rhosp_share_name }} \
-  #       --neutron-net-id {{ rhosp_ocp_network.networks[0].id }} \
-  #       --neutron-subnet-id {{ rhosp_ocp_network.networks[0].subnet_ids[0] }} \
-  #       -f json
-  #   register: rhosp_share_net_create_res
-
-  # # - name: "Parse share network create output"
-  # #   ansible.builtin.set_fact:
-  # #     rhosp_share_net_create_output:  "{{ rhosp_share_net_create_res.stdout | from_json }}"
-
-  # - name: "Create the NFS share"
-  #   ansible.builtin.command: |
-  #     openstack share create \
-  #       --os-region-name {{ rhosp_os_region }} \
-  #       --share-type {{ ovhc_rhosp_share_type }} \
-  #       --share-network {{ rhosp_share_name }} \
-  #       --name {{ rhosp_share_name }} \
-  #       NFS 150
-  #   register: rhosp_share_info_res
-
-  # # Authorize VMs by grantingt access to the share using the VM’s private IP (e.g., 10.1.0.123):
-  #   # openstack share access create \
-  #   #   --os-region-name <REGION_NAME> \
-  #   #   <my-first-share-name> \
-  #   #   ip 10.1.0.123
-  #   # loop for each server add access
-  # # Get the NFS export location:
-  #   # openstack share export location list --os-region-name <REGION_NAME> <my-first-share-name>
-
-  # - name: "Get share details"
-  #   ansible.builtin.command: |
-  #     openstack share show {{ rhosp_share_name }} -f json
-  #   register: rhosp_share_info_res
-
-  # # - name: "Print share information"
-  # #   ansible.builtin.debug:
-  # #     msg: 
-  # #     # - "rhosp_share_info_res: {{ rhosp_share_info_res.stdout | from_json }}"
-  # #     - "rhosp_share_info_res: {{ (rhosp_share_info_res.stdout | from_json).export_locations }}"
-  # #     - "rhosp_share_info_res: {{ (rhosp_share_info_res.stdout | from_json).export_locations | regex_search('\npath.*\n')}}"
-  # #     - "rhosp_share_info_res: {{ (rhosp_share_info_res.stdout | from_json).export_locations | split('\n') }}"
-
-  # - name: "Extract NFS Path"
-  #   ansible.builtin.set_fact:
-  #     rhosp_share_nfs_path_entry: "{{ ((rhosp_share_info_res.stdout | from_json).export_locations | regex_search('path.*\n'))[7:-1] }}"
-
-  # - name: "Print share information"
-  #   ansible.builtin.debug:
-  #     var: rhosp_share_nfs_path
   post_tasks:
   - name: "Print OUT share information"
     ansible.builtin.debug:
       msg:
       - "rhosp_share_manage_nfs_server: {{ rhosp_share_manage_nfs_server }}"
       - "rhosp_share_manage_nfs_path: {{ rhosp_share_manage_nfs_path }}"
+      - "nfs_share_urls: {{ nfs_share_urls }}"
       # - "ocp_nfs_storage_class_name: {{ ocp_nfs_storage_class_name }}"
 
   - name: "Extract NFS Path"
     ansible.builtin.set_fact:
       global_rhosp_share_nfs_server: "{{ rhosp_share_manage_nfs_server }}"
       global_rhosp_share_nfs_path: "{{ rhosp_share_manage_nfs_path }}"
+      global_nfs_share_urls: "{{ nfs_share_urls }}"
   #     ocp_nfs_storage_class_name: "nfs-csi-{{ rhosp_share_name }}"
       # delegate_to: localhost
       # delegate_facts: True
@@ -165,7 +90,7 @@
       msg:
       - "global_rhosp_share_nfs_server: {{ global_rhosp_share_nfs_server }}"
       - "global_rhosp_share_nfs_path: {{ global_rhosp_share_nfs_path }}"
-      # - "ocp_nfs_storage_class_name: {{ ocp_nfs_storage_class_name }}"
+      - global_nfs_share_urls: "{{ nfs_share_urls }}"
 
 - name: "Deploy RHOSP Manila as storage Backend"
   hosts: "{{ ocp_bastion | default('ocp_bastion') | default('localhost') }}"
@@ -176,6 +101,7 @@
     ansible.builtin.set_fact:
       rhosp_share_nfs_server: "{{ hostvars['localhost']['rhosp_share_manage_nfs_server'] }}"
       rhosp_share_nfs_path: "{{ hostvars['localhost']['rhosp_share_manage_nfs_path'] }}"
+      nfs_share_urls: "{{ hostvars['localhost']['nfs_share_urls'] }}"
       # ocp_nfs_storage_class_name: "{{ hostvars['localhost']['ocp_nfs_storage_class_name'] }}"
       # delegate_to: localhost
       # delegate_facts: True
@@ -185,6 +111,7 @@
       msg:
       - "rhosp_share_nfs_server: {{ rhosp_share_nfs_server }}"
       - "rhosp_share_nfs_path: {{ rhosp_share_nfs_path }}"
+      - "nfs_share_urls: {{ nfs_share_urls }}"
       # - "ocp_nfs_storage_class_name: {{ ocp_nfs_storage_class_name }}"
 
   - name: "Get RHOSP information from the environment"
@@ -201,7 +128,7 @@
   - name: "Print worker nodes"
     ansible.builtin.set_fact:
       worker_node_list: "{{ ocp_worker_nodes_res.stdout | from_json }}"
-      ocp_nfs_storage_class_name: "nfs-csi-{{ rhosp_share_manage_name }}"
+      # ocp_nfs_storage_class_name: "nfs-csi-{{ rhosp_share_manage_name }}"
 
   - name: "Print worker nodes"
     ansible.builtin.debug:
@@ -225,93 +152,31 @@
     ansible.builtin.shell: |
       curl -skSL https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/v4.13.1/deploy/install-driver.sh | bash -s v4.13.1 --
     
-  - name: "Template the Storage Class - {{ ocp_nfs_storage_class_name }}"
-    ansible.builtin.template:
-      src: "nfs-csi.yaml.j2"
-      dest: "/tmp/{{ ocp_nfs_storage_class_name }}.yaml"
-      mode: 0644
+  # - name: "Template the Storage Class - {{ ocp_nfs_storage_class_name }}"
+  #   ansible.builtin.template:
+  #     src: "nfs-csi.yaml.j2"
+  #     dest: "/tmp/{{ ocp_nfs_storage_class_name }}.yaml"
+  #     mode: 0644
 
-  - name: "Create the Storage Class"
-    ansible.builtin.command: |
-      oc apply -f "/tmp/{{ ocp_nfs_storage_class_name }}.yaml"
-    register: ocp_create_storage_class_res
-
-  - name: "Template Manila resources"
-    ansible.builtin.debug:
-      var: ocp_create_storage_class_res
+  # - name: "Create the Storage Class"
+  #   ansible.builtin.command: |
+  #     oc apply -f "/tmp/{{ ocp_nfs_storage_class_name }}.yaml"
+  #   register: ocp_create_storage_class_res
 
   # - name: "Template Manila resources"
-  #   ansible.builtin.template:
-  #     src: "{{ item }}.yaml.j2"
-  #     dest: "/tmp/{{ item }}.yaml"
-  #     mode: 0600
-  #   loop: "{{ manila_resource_templates }}"
+  #   ansible.builtin.debug:
+  #     var: ocp_create_storage_class_res
 
-  # - name: "Create Manila resources"
-  #   ansible.builtin.command: |
-  #     oc apply -f /tmp/{{ item }}.yaml
-  #   register: ocp_manila_resource_res
-  #   loop: "{{ manila_resource_templates }}"
-
-  # # - name: "Create Manila Config Map"
-  # #   ansible.builtin.command: |
-  # #     oc apply -f /tmp/kubernetes-cloud-provider-openstack-manila-secret.yaml
-  # #   register: ocp_cinder_secret
-
-  # # - name: "Create Manila Storage Class"
-  # #   ansible.builtin.command: |
-  # #     oc apply -f https://raw.githubusercontent.com/kubernetes/cloud-provider-openstack/refs/heads/release-{{ k8s_maj_min_version }}/examples/manila-csi-plugin/nfs/dynamic-provisioning/storageclass.yaml
-
-  # - name: "Deploy the RBACs"
-  #   ansible.builtin.shell: |
-  #     oc apply -f https://raw.githubusercontent.com/kubernetes/cloud-provider-openstack/refs/tags/{{ kubernetes_cloud_provider_openstack_version }}/manifests/manila-csi-plugin/csi-controllerplugin-rbac.yaml
-  #     oc apply -f https://raw.githubusercontent.com/kubernetes/cloud-provider-openstack/refs/tags/{{ kubernetes_cloud_provider_openstack_version }}/manifests/manila-csi-plugin/csi-nodeplugin-rbac.yaml
-
-  # - name: "Deploy the CSIDriver CRD"
-  #   ansible.builtin.command: |
-  #     oc apply -f https://raw.githubusercontent.com/kubernetes/cloud-provider-openstack/refs/tags/{{ kubernetes_cloud_provider_openstack_version }}/manifests/manila-csi-plugin/csidriver.yaml
-
-  # - name: "Download Controller and Node plugins to be modified"
-  #   ansible.builtin.get_url:
-  #     url: "https://raw.githubusercontent.com/kubernetes/cloud-provider-openstack/refs/tags/{{ kubernetes_cloud_provider_openstack_version }}/manifests/manila-csi-plugin/{{ item }}"
-  #     dest: "/tmp/{{ item }}"
-  #     mode: '0640'
-  #   loop:
-  #   - csi-controllerplugin.yaml
-  #   - csi-nodeplugin.yaml
-
-  # - name: "Fix MANILA_SHARE_PROTO"
-  #   ansible.builtin.replace:
-  #     after: "name: MANILA_SHARE_PROTO"
-  #     path: "/tmp/{{ item }}"
-  #     regexp: '^( +)value: "SHARE-PROTOCOL"$'
-  #     replace: '\1value: "{{ rhosp_manila_share_protcol }}"'
-  #     # replace: '\1value: "CephFS"'
-  #   # ansible.builtin.lineinfile:
-  #   #   path: "/tmp/{{ item }}"
-  #   #   search_string: 'value: "SHARE-PROTOCOL"'
-  #   #   line: 'value: "NFS"'
-  #   loop:
-  #   - csi-controllerplugin.yaml
-  #   - csi-nodeplugin.yaml
-
-  # # - name: "Modify the Controller and Node plugins"
-  # #   ansible.builtin.command: |
-  # #     oc apply -f https://raw.githubusercontent.com/kubernetes/cloud-provider-openstack/refs/heads/release-{{ k8s_maj_min_version }}/manifests/manila-csi-plugin/csidriver.yaml
-
-  # # - name: "Modify the Controller and Node plugins"
-  # #   ansible.builtin.command: |
-  # #     oc apply -f https://raw.githubusercontent.com/kubernetes/cloud-provider-openstack/refs/heads/release-{{ k8s_maj_min_version }}/manifests/manila-csi-plugin/csidriver.yaml
-
-  # # - name: "Pause until you can verify updates to an application were successful"
-  # #   ansible.builtin.pause:
-
-  # - name: "Deploy the Controller and Node plugins"
-  #   ansible.builtin.command: |
-  #     oc apply -f /tmp/{{ item }}
-  #   loop:
-  #   - csi-controllerplugin.yaml
-  #   - csi-nodeplugin.yaml
+  - ansible.builtin.include_tasks: 
+      file: ../tasks/nfs-csi-sc.yaml
+    vars:
+      rhosp_share_name: "{{ nfs_share_item.name }}"
+      rhosp_share_nfs_server: "{{ nfs_share_item.nfs_server }}"
+      rhosp_share_nfs_path: "{{ nfs_path }}"
+    loop: "{{ nfs_share_urls }}"
+    loop_control:
+      loop_var: nfs_share_item
+    register: deploy_nfs_csi_sc_task
 
 ...
  

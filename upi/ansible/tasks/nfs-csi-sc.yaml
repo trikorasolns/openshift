@@ -1,8 +1,12 @@
 # Requires:
-# * ocp_nfs_storage_class_name: 
+# * rhosp_share_name: 
 # * rhosp_share_nfs_server: 
-# * rhosp_share_nfs_path
+# * rhosp_share_nfs_path: 
 ---
+- name: "Define the Storage Class name"
+  ansible.builtin.set_fact:
+    ocp_nfs_storage_class_name: "nfs-csi-{{ rhosp_share_name }}"
+
 - name: "Template the Storage Class - {{ ocp_nfs_storage_class_name }}"
   ansible.builtin.template:
     src: "nfs-csi.yaml.j2"
@@ -13,4 +17,8 @@
   ansible.builtin.command: |
     oc apply -f "/tmp/{{ ocp_nfs_storage_class_name }}.yaml"
   register: ocp_create_storage_class_res
+
+- name: "Template Manila resources"
+  ansible.builtin.debug:
+    var: ocp_create_storage_class_res
 ...
