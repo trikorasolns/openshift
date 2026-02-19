@@ -41,7 +41,7 @@
   - name: "Print authentication file"
     ansible.builtin.debug:
       msg: 
-      - "rhosp_auth_file_contents: {{ rhosp_auth_file_contents }}"
+      - "rhosp_auth_file_contents: >{{ rhosp_auth_file_contents }}<"
       - "rhosp_auth_file_contents: {{ rhosp_auth_file_contents | type_debug}}"
       # - "rhosp_auth_file_contents: {{ rhosp_auth_file_contents | string | from_yaml }}"
       # - "rhosp_auth_file_contents: {{ rhosp_auth_file_contents | string | from_json }}"
