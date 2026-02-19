@@ -24,7 +24,7 @@
   - name: "Fetch authentication file"
     ansible.builtin.set_fact:
       rhosp_config_file: "{{ lookup('env', 'OS_CLIENT_CONFIG_FILE') }}"
-      rhosp_config_contents: "{{ lookup('ansible.builtin.file', lookup('env', 'OS_CLIENT_CONFIG_FILE')) }}"
+      rhosp_config_contents: "{{ lookup('ansible.builtin.file', lookup('env', 'OS_CLIENT_CONFIG_FILE')) | from_json }}"
 
   - name: "Print localhost variables"
     ansible.builtin.debug:
