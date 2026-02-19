@@ -9,7 +9,7 @@
 
 - name: "Template the Storage Class - {{ ocp_nfs_storage_class_name }}"
   ansible.builtin.template:
-    src: "nfs-csi.yaml.j2"
+    src: "../templates/nfs-csi.yaml.j2"
     dest: "/tmp/{{ ocp_nfs_storage_class_name }}.yaml"
     mode: 0644
 

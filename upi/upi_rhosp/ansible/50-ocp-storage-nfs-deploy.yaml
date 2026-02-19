@@ -6,6 +6,31 @@
   hosts: "localhost"
   gather_facts: true
 
+  pre_tasks:
+  - name: "Check for required variables"
+    ansible.builtin.assert:
+      that:
+      - (rhosp_share is defined and (rhosp_share | length > 0)) or (metadata.rhosp_share is defined and (metadata.rhosp_share | length > 0))
+      fail_msg:
+
+  - name: "Set actual RHOSP share information from metadata"
+    ansible.builtin.set_fact:
+      actual_rhosp_share: "{{ metadata.rhosp_share }}"
+    when: >
+      metadata.rhosp_share is defined and 
+      (metadata.rhosp_share | length > 0)
+
+  - name: "Set actual RHOSP share information from rhosp_share"
+    ansible.builtin.set_fact:
+      actual_rhosp_share: "{{ rhosp_share }}"
+    when: >
+      (actual_rhosp_share is not defined) and 
+      rhosp_share is defined and (rhosp_share | length > 0)
+
+  - name: "Print actual share information"
+    ansible.builtin.debug:
+      var: actual_rhosp_share
+
   tasks:
   - name: "Get RHOSP information from the environment"
     ansible.builtin.set_fact:
@@ -54,7 +79,7 @@
       rhosp_share_manage_type: "{{ rhosp_share_item.type }}"
       rhosp_share_manage_instance_list: "{{ rhosp_server_ips }}"
       state: present
-    loop: "{{ rhosp_share }}"
+    loop: "{{ actual_rhosp_share }}"
     loop_control:
       loop_var: rhosp_share_item
     register: deploy_shares_task
@@ -163,16 +188,16 @@
   #     oc apply -f "/tmp/{{ ocp_nfs_storage_class_name }}.yaml"
   #   register: ocp_create_storage_class_res
 
-  # - name: "Template Manila resources"
+  # - name: "Print input"
   #   ansible.builtin.debug:
-  #     var: ocp_create_storage_class_res
+  #     var: nfs_share_urls
 
   - ansible.builtin.include_tasks: 
-      file: ../tasks/nfs-csi-sc.yaml
+      file: ../../ansible/tasks/nfs-csi-sc.yaml
     vars:
-      rhosp_share_name: "{{ nfs_share_item.name }}"
+      rhosp_share_name: "{{ nfs_share_item.share_name }}"
       rhosp_share_nfs_server: "{{ nfs_share_item.nfs_server }}"
-      rhosp_share_nfs_path: "{{ nfs_path }}"
+      rhosp_share_nfs_path: "{{ nfs_share_item.nfs_path }}"
     loop: "{{ nfs_share_urls }}"
     loop_control:
       loop_var: nfs_share_item
