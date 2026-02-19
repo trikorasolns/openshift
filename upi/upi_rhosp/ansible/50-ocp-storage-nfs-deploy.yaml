@@ -67,14 +67,9 @@
     ansible.builtin.debug:
       var: rhosp_server_ips
 
-  - name: "Print localhost variables"
-    ansible.builtin.debug:
-      var: hostvars['localhost']
-
-  - name: "Print localhost variables"
-    ansible.builtin.debug:
-      msg:
-      - "OS_CLIENT_CONFIG_FILE: {{ lookup('env', 'OS_CLIENT_CONFIG_FILE') }}"
+  # - name: "Print localhost variables"
+  #   ansible.builtin.debug:
+  #     var: hostvars['localhost']
 
   - ansible.builtin.include_tasks: 
       file: tasks/rhosp-shares.yaml
