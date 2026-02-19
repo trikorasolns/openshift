@@ -23,20 +23,45 @@
   tasks:
   - name: "Fetch authentication file"
     ansible.builtin.set_fact:
-      rhosp_config_file: "{{ lookup('env', 'OS_CLIENT_CONFIG_FILE') }}"
-      rhosp_config_contents: "{{ lookup('ansible.builtin.file', lookup('env', 'OS_CLIENT_CONFIG_FILE')) | from_json }}"
+      # rhosp_config_file: "{{ lookup('env', 'OS_CLIENT_CONFIG_FILE') }}"
+      rhosp_auth_file_contents: |-
+        {% if rhosp_auth_file_contents is defined %}
+        {{ rhosp_auth_file_contents }}
+        {% elif lookup('env', 'OS_CLIENT_CONFIG_FILE') | length > 0 %}
+        {{ lookup('ansible.builtin.file', lookup('env', 'OS_CLIENT_CONFIG_FILE')) | default('') | from_yaml }}"
+        {% endif %}
+    # failed_when: false
+    # when: lookup('env', 'OS_CLIENT_CONFIG_FILE') | length > 0
 
-  - name: "Print localhost variables"
+  - name: "Print authentication file"
+    ansible.builtin.debug:
+      var: rhosp_auth_file_contents
+
+  - name: "Set RHOSP cloud info from ENV"
+    ansible.builtin.set_fact:
+      rhosp_cloud_region: |-
+        {% if rhosp_cloud_region is defined %}{{ rhosp_cloud_region }}
+        {% elif rhosp_auth_file_contents is defined and rhosp_auth_file_contents | length > 0 %}{{ rhosp_auth_file_contents.clouds.devstack.region_name }}
+        {% else %}{{ lookup('ansible.builtin.env', 'OS_REGION_NAME') }}
+        {% endif %}
+    # when: lookup('ansible.builtin.env', 'OS_REGION_NAME') | length > 0
+
+  # - name: "Set RHOSP cloud info from cloud file"
+  #   ansible.builtin.set_fact:
+  #     rhosp_cloud_region: "{{ rhosp_cloud_region | default(lookup('ansible.builtin.env', 'OS_REGION_NAME') | default (rhosp_auth_file_contents.clouds.devstack.region_name) )}}"
+  #   when: lookup('ansible.builtin.env', 'OS_CLIENT_CONFIG_FILE') | length > 0
+
+  - name: "Print OpenShift Cloud variables"
     ansible.builtin.debug:
       msg:
-      - "rhosp_config_file: {{ rhosp_config_file }}"
-      - "rhosp_config_contents: {{ rhosp_config_contents }}"
+      # - "rhosp_config_file: {{ rhosp_config_file }}"
+      - "rhosp_cloud_region: {{ rhosp_cloud_region }}"
 
   - name: "Set required RHOCP facts"
     ansible.builtin.set_fact:
       # ocp_subdomain: "{{ ocp_cluster_name }}.{{ local_domain }}"
       # ocp_cluster_id_tag: "openshiftClusterID={{ ocp_infra_id  }}"
-      rhosp_region_name: "{{ lookup('ansible.builtin.env', 'OS_REGION_NAME') }}"
+      # rhosp_region_name: "{{ lookup('ansible.builtin.env', 'OS_REGION_NAME') }}"
       rhosp_rhcoreos_image_name: "rhcos-{{ ocp_cluster_name }}"
       rhosp_fip_api_name: "ocp-{{ ocp_cluster_name }}-api"
       rhosp_fip_ingress_name: "ocp-{{ ocp_cluster_name }}-ingress"

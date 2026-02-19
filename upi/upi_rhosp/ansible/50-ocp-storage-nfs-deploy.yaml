@@ -78,7 +78,7 @@
       rhosp_share_manage_network_name: "{{ rhosp_share_item.network }}"
       rhosp_share_manage_neutron_network: "{{ rhosp_network }}"
       rhosp_share_manage_protocol: "{{ rhosp_share_item.protocol }}"
-      rhosp_share_manage_region: "{{ rhosp_os_region }}"
+      rhosp_share_manage_region: "{{ rhosp_cloud_region }}"
       rhosp_share_manage_size: "{{ rhosp_share_item.size }}"
       rhosp_share_manage_type: "{{ rhosp_share_item.type }}"
       rhosp_share_manage_instance_list: "{{ rhosp_server_ips }}"
@@ -143,10 +143,10 @@
       - "nfs_share_urls: {{ nfs_share_urls }}"
       # - "ocp_nfs_storage_class_name: {{ ocp_nfs_storage_class_name }}"
 
-  - name: "Get RHOSP information from the environment"
-    ansible.builtin.set_fact:
-      rhosp_os_username: "{{ lookup('ansible.builtin.env', 'OS_USERNAME') }}"
-      rhosp_os_password: "{{ lookup('ansible.builtin.env', 'OS_PASSWORD') }}"
+  # - name: "Get RHOSP information from the environment"
+  #   ansible.builtin.set_fact:
+  #     rhosp_os_username: "{{ lookup('ansible.builtin.env', 'OS_USERNAME') }}"
+  #     rhosp_os_password: "{{ lookup('ansible.builtin.env', 'OS_PASSWORD') }}"
 
   tasks:
   - name: "List the worker nodes."
