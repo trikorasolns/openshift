@@ -29,7 +29,7 @@
         {% if rhosp_auth_file_contents is defined %}
         {{ rhosp_auth_file_contents }}
         {% elif lookup('env', 'OS_CLIENT_CONFIG_FILE') | length > 0 %}
-        {{ lookup('ansible.builtin.file', lookup('env', 'OS_CLIENT_CONFIG_FILE')) | default('') | string | from_yaml }}"
+        {{ lookup('ansible.builtin.file', lookup('env', 'OS_CLIENT_CONFIG_FILE')) | default('') }}"
         {% endif %}
     # failed_when: false
     # when: lookup('env', 'OS_CLIENT_CONFIG_FILE') | length > 0
@@ -42,13 +42,13 @@
     ansible.builtin.debug:
       msg: 
       - "rhosp_auth_file_contents: {{ rhosp_auth_file_contents }}"
-      - "rhosp_auth_file_contents type: {{ rhosp_auth_file_contents | type_debug }}"
-  #     - "rhosp_auth_file_contents: {{ rhosp_auth_file_contents | string | from_yaml }}"
-  #     # - "rhosp_auth_file_contents: {{ rhosp_auth_file_contents | string | from_json }}"
-  #     # - "rhosp_auth_file_contents: {{ rhosp_auth_file_contents | from_yaml | string }}"
-  #     - "rhosp_auth_file_contents type: {{ rhosp_auth_file_contents | string | type_debug }}"
-  #     - "rhosp_auth_file_contents type: {{ rhosp_auth_file_contents | string | from_yaml | type_debug }}"
-  #     # - "rhosp_auth_file_contents type: {{ rhosp_auth_file_contents | string | from_json | type_debug }}"
+      - "rhosp_auth_file_contents: {{ rhosp_auth_file_contents | string | from_yaml }}"
+      # - "rhosp_auth_file_contents: {{ rhosp_auth_file_contents | string | from_json }}"
+      # - "rhosp_auth_file_contents: {{ rhosp_auth_file_contents | from_yaml | string }}"
+      - "rhosp_auth_file_contents type 1: {{ rhosp_auth_file_contents | type_debug }}"
+      - "rhosp_auth_file_contents type 2: {{ rhosp_auth_file_contents | string | type_debug }}"
+      - "rhosp_auth_file_contents type 3: {{ rhosp_auth_file_contents | string | from_yaml | type_debug }}"
+      # - "rhosp_auth_file_contents type: {{ rhosp_auth_file_contents | string | from_json | type_debug }}"
 
   - name: "Print authentication file"
     ansible.builtin.debug:
