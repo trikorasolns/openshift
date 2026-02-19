@@ -28,7 +28,7 @@
         {% if rhosp_auth_file_contents is defined %}
         {{ rhosp_auth_file_contents }}
         {% elif lookup('env', 'OS_CLIENT_CONFIG_FILE') | length > 0 %}
-        {{ lookup('ansible.builtin.file', lookup('env', 'OS_CLIENT_CONFIG_FILE')) | default('') | from_yaml | from_json }}"
+        {{ lookup('ansible.builtin.file', lookup('env', 'OS_CLIENT_CONFIG_FILE')) | default('') | from_yaml | string | from_json }}"
         {% endif %}
     # failed_when: false
     # when: lookup('env', 'OS_CLIENT_CONFIG_FILE') | length > 0
