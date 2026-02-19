@@ -13,19 +13,19 @@
       - (rhosp_share is defined and (rhosp_share | length > 0)) or (metadata.rhosp_share is defined and (metadata.rhosp_share | length > 0))
       fail_msg:
 
-  - name: "Set actual RHOSP share information from metadata"
-    ansible.builtin.set_fact:
-      actual_rhosp_share: "{{ metadata.rhosp_share }}"
-    when: >
-      metadata.rhosp_share is defined and 
-      (metadata.rhosp_share | length > 0)
-
   - name: "Set actual RHOSP share information from rhosp_share"
     ansible.builtin.set_fact:
       actual_rhosp_share: "{{ rhosp_share }}"
     when: >
-      (actual_rhosp_share is not defined) and 
       rhosp_share is defined and (rhosp_share | length > 0)
+
+  - name: "Set actual RHOSP share information from metadata"
+    ansible.builtin.set_fact:
+      actual_rhosp_share: "{{ metadata.rhosp_share }}"
+    when: >
+      (actual_rhosp_share is not defined) and 
+      metadata.rhosp_share is defined and 
+      (metadata.rhosp_share | length > 0)
 
   - name: "Print actual share information"
     ansible.builtin.debug:
@@ -66,6 +66,10 @@
   - name: "Print ip array"
     ansible.builtin.debug:
       var: rhosp_server_ips
+
+  - name: "Print localhost variables"
+    ansible.builtin.debug:
+      var: hostvars['localhost']
 
   - ansible.builtin.include_tasks: 
       file: tasks/rhosp-shares.yaml
