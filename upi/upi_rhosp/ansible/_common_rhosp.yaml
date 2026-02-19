@@ -37,6 +37,16 @@
     ansible.builtin.debug:
       var: rhosp_auth_file_contents
 
+  - name: "Print authentication file"
+    ansible.builtin.debug:
+      msg: 
+      - "rhosp_auth_file_contents: {{ rhosp_auth_file_contents }}"
+
+  - name: "Print authentication file"
+    ansible.builtin.debug:
+      msg: 
+      - "rhosp_auth_file_contents: {{ rhosp_auth_file_contents.clouds }}"
+
   - name: "Set RHOSP cloud info from ENV"
     ansible.builtin.set_fact:
       rhosp_cloud_region: |-
