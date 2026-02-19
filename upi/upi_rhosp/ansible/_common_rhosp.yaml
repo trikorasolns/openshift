@@ -41,7 +41,7 @@
     ansible.builtin.set_fact:
       rhosp_cloud_region: |-
         {% if rhosp_cloud_region is defined %}{{ rhosp_cloud_region }}
-        {% elif rhosp_auth_file_contents is defined and rhosp_auth_file_contents | length > 0 %}{{ rhosp_auth_file_contents.clouds.devstack.region_name }}
+        {% elif rhosp_auth_file_contents is defined and rhosp_auth_file_contents | length > 0 %}{{ rhosp_auth_file_contents['clouds'].devstack.region_name }}
         {% else %}{{ lookup('ansible.builtin.env', 'OS_REGION_NAME') }}
         {% endif %}
     # when: lookup('ansible.builtin.env', 'OS_REGION_NAME') | length > 0
