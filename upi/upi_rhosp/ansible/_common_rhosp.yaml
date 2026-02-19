@@ -43,9 +43,12 @@
       msg: 
       - "rhosp_auth_file_contents: {{ rhosp_auth_file_contents }}"
       - "rhosp_auth_file_contents: {{ rhosp_auth_file_contents | string | from_yaml }}"
+      - "rhosp_auth_file_contents: {{ rhosp_auth_file_contents | string | from_json }}"
       # - "rhosp_auth_file_contents: {{ rhosp_auth_file_contents | from_yaml | string }}"
       - "rhosp_auth_file_contents type: {{ rhosp_auth_file_contents | type_debug }}"
       - "rhosp_auth_file_contents type: {{ rhosp_auth_file_contents | string | type_debug }}"
+      - "rhosp_auth_file_contents type: {{ rhosp_auth_file_contents | string | from_yaml | type_debug }}"
+      - "rhosp_auth_file_contents type: {{ rhosp_auth_file_contents | string | from_json | type_debug }}"
 
   - name: "Print authentication file"
     ansible.builtin.debug:
