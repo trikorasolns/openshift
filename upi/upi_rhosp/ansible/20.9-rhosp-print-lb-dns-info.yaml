@@ -1,7 +1,7 @@
 ---
 - name: "Collect information"
   import_playbook: _common_rhosp.yaml
-  when: ocp_cluster_id_tag is not defined
+  # when: ocp_cluster_id_tag is not defined
 
 - name: "Print DNS INFO"
   hosts: "localhost"

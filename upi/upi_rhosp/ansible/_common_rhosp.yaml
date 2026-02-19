@@ -1,104 +1,13 @@
 ---
 - name: "Collect information"
   import_playbook: ../../ansible/00-fetch-ocp-installation-info-playbook.yaml
-  
-# - name: "Read installation info from openshift installation"
-#   hosts: "{{ ocp_bastion | default('localhost') }}"
-#   gather_facts: true
 
-#   pre_tasks:
-#   - name: "Check required variables"
-#     ansible.builtin.assert:
-#       that:
-#         - ocp_cluster_name is defined and (ocp_cluster_name | length > 0)
-#       fail_msg:
-#         - "The name of the OCP cluster must be defined in the 'ocp_cluster_name' variable."
+# - name: "Collect information with ignition"
+#   import_playbook: ../../ansible/00-fetch-ocp-installation-info-with-ignition-playbook.yaml
 
-#   - name: "Define variables"
-#     ansible.builtin.include_tasks:
-#       file: ../../ansible/tasks/set_ocp_install_dir.yaml
-
-#   tasks:
-#     - name: "Obtain the correct version of your RHCOS images"
-#       ansible.builtin.shell: |
-#           ./openshift-install coreos print-stream-json
-#       register: coreos_stream_res
-#       args:
-#         chdir: "{{ openshift_install_dir }}"
-
-#     - name: "RHCOS output"
-#       ansible.builtin.debug:
-#         var: coreos_stream_res.stdout
-#         verbosity: 2
-
-#     - name: "Set fact for coreos information"
-#       ansible.builtin.set_fact:
-#         coreos_stream_json: "{{ coreos_stream_res.stdout | from_json  }}"
-
-#     - name: "Set fact for the image location"
-#       ansible.builtin.set_fact:
-#         coreos_image_location: "{{ coreos_stream_json['architectures']['x86_64']['artifacts']['openstack']['formats']['qcow2.gz']['disk']['location']  }}"
-
-#     - name: "RHCOS image to use"
-#       ansible.builtin.debug:
-#         msg: 
-#         - "CoreOS ISO disk location: {{ coreos_image_location }}"
-
-#     - name: "Read metadata file"
-#       ansible.builtin.slurp:
-#         src: "{{ openshift_cluster_install_dir }}/metadata.json"
-#       register: metadata_json_slurp
-
-#     - name: "Parse metadata information"
-#       ansible.builtin.set_fact:
-#         metadata_json: "{{ metadata_json_slurp.content | b64decode }}"
-
-#     - name: "Fetch all Ignition files"
-#       ansible.builtin.fetch:
-#         src: "{{ openshift_cluster_install_dir }}/{{ item }}.ign"
-#         dest: "/tmp/{{ item }}-{{ metadata_json.infraID }}.ign"
-#         flat: true
-#       loop:
-#       - bootstrap
-#       - master
-#       - worker
-
-#     - name: "Read bootstrap Ignition file signature"
-#       ansible.builtin.slurp:
-#         src: "{{ openshift_cluster_install_dir }}/bootstrap.ign.sig"
-#       register: bootstrap_sig_slurp
-
-#     - name: "Read master Ignition file signature"
-#       ansible.builtin.slurp:
-#         src: "{{ openshift_cluster_install_dir }}/master.ign.sig"
-#       register: master_sig_slurp
-
-#     - name: "Read worker Ignition file signature"
-#       ansible.builtin.slurp:
-#         src: "{{ openshift_cluster_install_dir }}/worker.ign.sig"
-#       register: worker_sig_slurp
-
-#   post_tasks:
-
-#     - name: "Set CoreOS Image Location under localhost"
-#       ansible.builtin.set_fact:
-#         global_coreos_image_location: "{{ coreos_image_location }}"
-#       delegate_to: localhost
-#       delegate_facts: True
-
-#     - name: "Set CoreOS Image Location under localhost"
-#       ansible.builtin.set_fact:
-#         global_bootstrap_hash: "{{ bootstrap_sig_slurp.content | b64decode }}"
-#         global_master_hash: "{{ master_sig_slurp.content | b64decode }}"
-#         global_worker_hash: "{{ worker_sig_slurp.content | b64decode }}"
-#         global_metadata_json: "{{ metadata_json }}"
-#       delegate_to: localhost
-#       delegate_facts: True
-
-- name: "Setup Environment"
-  # hosts: "{{ ocp_bastion | default('ocp_bastion') | default('localhost') }}"
+- name: "Setup RHOSP Environment"
   hosts: "localhost"
-  gather_facts: true
+  gather_facts: false
 
   # pre_tasks:
   # - name: "Fetch Global variables"
@@ -112,10 +21,6 @@
   #   delegate_to: localhost
   
   tasks:
-  # - name: "Set metadata infra ID"
-  #   ansible.builtin.set_fact:
-  #     ocp_infra_id: "{{ metadata_json.infraID }}"
-
   - name: "Set required RHOCP facts"
     ansible.builtin.set_fact:
       # ocp_subdomain: "{{ ocp_cluster_name }}.{{ local_domain }}"
@@ -133,5 +38,4 @@
       rhosp_loadbalancer_prefix: "ocp-{{ ocp_cluster_name }}" # Prefix used on the cluster load balancer names.
       # rhosp_loadbalancer_pool_name: "ocp-{{ ocp_cluster_name }}-pool"
       rhosp_loadbalancer_pool_name: "control-plane"
-
 ...

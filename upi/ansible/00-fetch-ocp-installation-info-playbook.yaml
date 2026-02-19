@@ -106,7 +106,7 @@
       delegate_to: localhost
       delegate_facts: True
 
-- name: "Setup Environment"
+- name: "Setup OCP Environment"
   hosts: "localhost"
   gather_facts: false
 
