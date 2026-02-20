@@ -25,6 +25,16 @@
     ansible.builtin.debug:
       msg:
       - "OS_CLIENT_CONFIG_FILE: {{ lookup('env', 'OS_CLIENT_CONFIG_FILE') }}"
+
+  - name: "Print authentication file"
+    ansible.builtin.shell: |
+      cat {{ lookup('env', 'OS_CLIENT_CONFIG_FILE') }}
+    register: aaa
+
+  - name: "Print authentication file"
+    ansible.builtin.debug:
+      var: aaa
+
   - name: "Fetch authentication file"
     ansible.builtin.set_fact:
       # rhosp_config_file: "{{ lookup('env', 'OS_CLIENT_CONFIG_FILE') }}"
