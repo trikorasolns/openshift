@@ -27,7 +27,7 @@
     openstack share create \
       --os-region-name {{ rhosp_cloud_region }} \
       --share-type {{ rhosp_share_manage_type }} \
-      --share-network {{ rhosp_share_manage_name }} \
+      --share-network {{ rhosp_share_manage_network_name }} \
       --name {{ rhosp_share_manage_name }} \
       {{ rhosp_share_manage_protocol }} {{ rhosp_share_manage_size }} \
       -f json
