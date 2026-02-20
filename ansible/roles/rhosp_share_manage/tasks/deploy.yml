@@ -34,6 +34,15 @@
   register: rhosp_share_manage_share_create_res
   when: rhosp_share_manage_share_show_res.rc != 0
 
+- name: "Wait for the share to be available"
+  ansible.builtin.command: |
+    openstack share show {{ rhosp_share_manage_name }} -f json
+  register: rhosp_share_manage_share_show_res
+  when: rhosp_share_manage_share_show_res.rc != 0
+  until: "rhosp_share_manage_share_show_res.stdout.status == 'available'"
+  retries: 40
+  delay: 15
+
 - name: "Authorize VMs by granting access to the share using the VM's private IP"
   ansible.builtin.command: |
     openstack share access create \
