@@ -11,7 +11,13 @@
     ansible.builtin.assert:
       that:
       - (rhosp_share is defined and (rhosp_share | length > 0)) or (metadata.rhosp_share is defined and (metadata.rhosp_share | length > 0))
+      - (rhosp_cloud_region is defined and (rhosp_cloud_region | length > 0))
       fail_msg:
+
+  - name: "Print OpenShift Cloud variables"
+    ansible.builtin.debug:
+      msg:
+      - "rhosp_cloud_region: {{ rhosp_cloud_region }}"
 
   - name: "Set actual RHOSP share information from rhosp_share"
     ansible.builtin.set_fact:
