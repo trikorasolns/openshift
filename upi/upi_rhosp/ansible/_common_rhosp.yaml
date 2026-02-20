@@ -21,6 +21,10 @@
   #   delegate_to: localhost
   
   tasks:
+  - name: "Print authentication file"
+    ansible.builtin.debug:
+      msg:
+      - "OS_CLIENT_CONFIG_FILE: {{ lookup('env', 'OS_CLIENT_CONFIG_FILE') }}"
   - name: "Fetch authentication file"
     ansible.builtin.set_fact:
       # rhosp_config_file: "{{ lookup('env', 'OS_CLIENT_CONFIG_FILE') }}"
@@ -30,6 +34,12 @@
         {{ rhosp_auth_file_contents }}
         {% elif lookup('env', 'OS_CLIENT_CONFIG_FILE') | length > 0 %}
         {{ lookup('ansible.builtin.file', lookup('env', 'OS_CLIENT_CONFIG_FILE')) | default('') }}"
+        {% endif %}
+      rhosp_auth_fileglob_contents: |-
+        {% if rhosp_auth_file_contents is defined %}
+        {{ rhosp_auth_file_contents }}
+        {% elif lookup('env', 'OS_CLIENT_CONFIG_FILE') | length > 0 %}
+        {{ lookup('ansible.builtin.fileglob', lookup('env', 'OS_CLIENT_CONFIG_FILE')) | default('') }}"
         {% endif %}
     # failed_when: false
     # when: lookup('env', 'OS_CLIENT_CONFIG_FILE') | length > 0
