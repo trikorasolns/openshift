@@ -2,7 +2,12 @@
 - name: "Validate required variables"
   ansible.builtin.assert:
     that:
-    - "ocp_install_root_dir is defined and ocp_install_root_dir | length > 0"
+    - "(ocp_install_root_dir is defined and ocp_install_root_dir | length > 0) or (metadata.ocp_install_root_dir is defined and metadata.ocp_install_root_dir | length > 0)"
+
+- name: "Set actual root dir"
+  ansible.builtin.set_fact:
+    ocp_install_root_dir: "{{ metadata.ocp_install_root_dir }}"
+  when: ocp_install_root_dir is not defined
 
 - name: "Define OCP install root directory"
   ansible.builtin.set_fact:
