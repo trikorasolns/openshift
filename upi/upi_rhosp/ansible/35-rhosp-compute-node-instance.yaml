@@ -45,9 +45,9 @@
 
   - name: 'Create the Compute Node servers'
     openstack.cloud.server:
-      name: "{{ rhosp_compute_node_server_prefix }}-{{ item }}"
+      name: "{{ rhosp_compute_node_server_prefix }}-{{ rhosp_compute_node_item.id }}"
       image: "{{ rhosp_rhcoreos_image_name }}"
-      flavor: "{{ rhosp_compute_node[item].flavor | default(rhosp_flavor_worker) }}"
+      flavor: "{{ rhosp_compute_node_item.flavor | default(rhosp_flavor_worker) }}"
       userdata: "{{ lookup('file', '/tmp/worker-' + metadata_json.infraID + '.ign') | string }}"
       # userdata: "{{ lookup('file', openshift_cluster_install_dir + '/worker-' + metadata_json.infraID + '.ign') | string }}"
       network: "{{ rhosp_network }}"
@@ -57,12 +57,15 @@
       # meta: "{{ ocp_cluster_id_tag }}"
       meta: 
         openshiftClusterID: "{{ ocp_infra_id }}"
-        hostname: "{{ rhosp_compute_node_server_prefix }}-{{ item }}"
+        hostname: "{{ rhosp_compute_node_server_prefix }}-{{ rhosp_compute_node_item.id }}"
       # wait: false # due to TypeError: 'NoneType' object is not subscriptable
       security_groups:
       - default
     when: rhosp_computenode_server_info.servers | length < ocp_compute_node_count
-    loop: "{{ range(rhosp_computenode_server_info.servers | length +1 , ocp_compute_node_count + 1) }}"
+    # loop: "{{ range(rhosp_computenode_server_info.servers | length +1 , ocp_compute_node_count + 1) }}"
+    loop: "{{ rhosp_compute_node | sort(attribute='id') }}"
+    loop_control:
+      loop_var: rhosp_compute_node_item
 
   # - name: "Add members to the public load-balancer pool"
   #   openstack.cloud.lb_member:

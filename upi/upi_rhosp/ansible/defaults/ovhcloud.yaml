@@ -1,15 +1,19 @@
 # OVHCloud:
 # Storage
 rhosp_share_type: standard-1az
-# Instances
+# Instances (vCore/RAM)
 # b3-8: 2/8
 # b3-16: 4/16
+# b3-32: 8/32
+# b3-64: 16/64
 # c3-8: 4/8
 # c3-16: 8/16 
+# c3-32: 16/32
+# c3-64: 32/64
 rhosp_flavor_bastion: b3-8
 rhosp_flavor_bootstrap: c3-8
-rhosp_flavor_master: c3-16
-rhosp_flavor_worker: c3-8
+rhosp_flavor_master: b3-16
+rhosp_flavor_worker: c3-16
 # LB Flavor:
 # * small
 # * medium
@@ -23,24 +27,24 @@ rhosp_lb_flavor: medium
 # - {name: "stats", port: 9000, protocol: "TCP"}
 # rhosp_lb_internal_ports:
 # - {name: "api-int", port: 22623, protocol: "TCP"}
-# - {name: "api-server-private", port: 6443, protocol: "TCP"}
+# - {name: "api-server-private", port: 6443, protocolducatI$11TCP"}
 # ocp_control_plane_count: 3
 # ocp_compute_node_count: 3
 
 
 rhosp_compute_node:
-  1:
+  - id: 1
     flavor: c3-16
-  2:
+  - id: 2
     flavor: c3-16
-  3:
+  - id: 3
     flavor: c3-16
-  # 4:
-  #   flavor: c3-16
-  # 5:
-  #   flavor: c3-16
-  # 6:
-  #   flavor: c3-16
+  - id: 4
+    flavor: b3-64
+  - id: 5
+    flavor: b3-64
+  - id: 6
+    flavor: b3-64
   # 7:
   #   flavor: c3-16
   # 8:
