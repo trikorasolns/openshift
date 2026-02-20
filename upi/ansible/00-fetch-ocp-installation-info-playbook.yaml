@@ -30,6 +30,7 @@
       register: coreos_stream_res
       args:
         chdir: "{{ openshift_install_dir }}"
+      changed_when: false
 
     - name: "RHCOS output"
       ansible.builtin.debug:

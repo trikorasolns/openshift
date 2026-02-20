@@ -25,7 +25,7 @@
 - name: "Create the NFS share"
   ansible.builtin.command: |
     openstack share create \
-      --os-region-name {{ rhosp_share_manage_region }} \
+      --os-region-name {{ rhosp_cloud_region }} \
       --share-type {{ rhosp_share_manage_type }} \
       --share-network {{ rhosp_share_manage_name }} \
       --name {{ rhosp_share_manage_name }} \
@@ -37,7 +37,7 @@
 - name: "Authorize VMs by granting access to the share using the VM's private IP"
   ansible.builtin.command: |
     openstack share access create \
-      --os-region-name {{ rhosp_share_manage_region }} \
+      --os-region-name {{ rhosp_cloud_region }} \
       {{ rhosp_share_manage_name }} \
       ip {{ rhosp_share_manage_instance_item }}
   loop: "{{ rhosp_share_manage_instance_list }}"
@@ -52,7 +52,7 @@
 - name: "Get the NFS export location"
   ansible.builtin.command: |
     openstack share export location list \
-      --os-region-name {{ rhosp_share_manage_region }} \
+      --os-region-name {{ rhosp_cloud_region }} \
       {{ rhosp_share_manage_name }} \
       -f json
   register: rhosp_share_manage_export_location_info_res
