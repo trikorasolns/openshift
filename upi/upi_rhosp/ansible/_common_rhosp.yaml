@@ -33,7 +33,7 @@
         {% if rhosp_auth_file_contents is defined %}
         {{ rhosp_auth_file_contents }}
         {% elif lookup('env', 'OS_CLIENT_CONFIG_FILE') | length > 0 %}
-        {{ lookup('ansible.builtin.file', lookup('env', 'OS_CLIENT_CONFIG_FILE')) | default('') }}"
+        {{ (lookup('ansible.builtin.file', lookup('env', 'OS_CLIENT_CONFIG_FILE')) | trim) | default('') }}"
         {% endif %}
       rhosp_auth_fileglob_contents: |-
         {% if rhosp_auth_file_contents is defined %}
@@ -47,10 +47,10 @@
   - name: "Print authentication file"
     ansible.builtin.debug:
       var: rhosp_auth_file_contents
-  - name: "Print authentication file"
+
+  - name: "Print authentication fileglob"
     ansible.builtin.debug:
       var: rhosp_auth_fileglob_contents
-
 
   - name: "Print authentication file"
     ansible.builtin.debug:
@@ -64,10 +64,10 @@
       # - "rhosp_auth_file_contents type 3: {{ rhosp_auth_file_contents | string | from_yaml | type_debug }}"
       # - "rhosp_auth_file_contents type: {{ rhosp_auth_file_contents | string | from_json | type_debug }}"
 
-  - name: "Print authentication file"
-    ansible.builtin.debug:
-      msg: 
-      - "rhosp_auth_file_contents: {{ rhosp_auth_file_contents.clouds }}"
+  # - name: "Print authentication file"
+  #   ansible.builtin.debug:
+  #     msg: 
+  #     - "rhosp_auth_file_contents: {{ rhosp_auth_file_contents.clouds }}"
 
   - name: "Set RHOSP cloud info from ENV"
     ansible.builtin.set_fact:
