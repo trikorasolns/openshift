@@ -47,6 +47,10 @@
   - name: "Print authentication file"
     ansible.builtin.debug:
       var: rhosp_auth_file_contents
+  - name: "Print authentication file"
+    ansible.builtin.debug:
+      var: rhosp_auth_fileglob_contents
+
 
   - name: "Print authentication file"
     ansible.builtin.debug:
