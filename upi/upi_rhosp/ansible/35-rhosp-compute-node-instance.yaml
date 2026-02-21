@@ -28,10 +28,10 @@
 
   tasks:
   - name: "Determine the number of compute nodes"
-    openstack.cloud.set_fact:
+    ansible.builtin.set_fact:
       ocp_compute_node_count: "{{ rhosp_compute_node | length }}*"
 
-  - name: "Print Compute Node count"
+  - name: "Print Compute Node rhosp_computenode_server_info"
     ansible.builtin.debug:
       var: ocp_compute_node_count
 
