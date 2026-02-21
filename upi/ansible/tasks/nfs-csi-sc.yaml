@@ -5,7 +5,7 @@
 ---
 - name: "Define the Storage Class name"
   ansible.builtin.set_fact:
-    ocp_nfs_storage_class_name: "nfs-csi-{{ rhosp_share_name }}"
+    ocp_nfs_storage_class_name: "nfs-csi-sc-{{ rhosp_share_name }}"
 
 - name: "Template the Storage Class - {{ ocp_nfs_storage_class_name }}"
   ansible.builtin.template:
