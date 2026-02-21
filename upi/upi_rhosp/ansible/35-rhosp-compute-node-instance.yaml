@@ -68,7 +68,7 @@
       # wait: false # due to TypeError: 'NoneType' object is not subscriptable
       security_groups:
       - default
-    when: rhosp_computenode_server_info.servers | length < ocp_compute_node_count
+    when: (rhosp_computenode_server_info.servers | length) < (ocp_compute_node_count | int)
     # loop: "{{ range(rhosp_computenode_server_info.servers | length +1 , ocp_compute_node_count + 1) }}"
     loop: "{{ rhosp_compute_node | sort(attribute='id') }}"
     loop_control:
