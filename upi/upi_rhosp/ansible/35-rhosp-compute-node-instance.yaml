@@ -29,7 +29,7 @@
   tasks:
   - name: "Determine the number of compute nodes"
     ansible.builtin.set_fact:
-      ocp_compute_node_count: "{{ rhosp_compute_node | length }}"
+      ocp_compute_node_count: "{{ rhosp_compute_node | length | int }}"
 
   - name: "Print Compute Node rhosp_computenode_server_info"
     ansible.builtin.debug:
