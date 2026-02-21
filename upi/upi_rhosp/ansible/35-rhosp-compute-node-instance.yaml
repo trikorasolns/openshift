@@ -27,6 +27,13 @@
   gather_facts: true
 
   tasks:
+  - name: "Determine the number of compute nodes"
+    openstack.cloud.set_fact:
+      ocp_compute_node_count: "{{ rhosp_compute_node | length }}*"
+
+  - name: "Print Compute Node count"
+    ansible.builtin.debug:
+      var: ocp_compute_node_count
 
   - name: "Check if any Compute Node instances exists on RHOSP"
     openstack.cloud.server_info:
