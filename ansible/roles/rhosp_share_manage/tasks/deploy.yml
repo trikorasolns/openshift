@@ -39,7 +39,7 @@
     openstack share show {{ rhosp_share_manage_name }} -f json
   register: rhosp_share_manage_share_show_res
   when: rhosp_share_manage_share_show_res.rc != 0
-  until: "rhosp_share_manage_share_show_res.stdout.status == 'available'"
+  until: "(rhosp_share_manage_share_show_res.stdout | from_json).status == 'available'"
   retries: 40
   delay: 15
 
