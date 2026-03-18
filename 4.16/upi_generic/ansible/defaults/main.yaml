@@ -10,8 +10,22 @@ rhosp_lb_public_ports:
 rhosp_lb_internal_ports:
 - {name: "api-int", port: 22623, protocol: "TCP"}
 - {name: "api-server", port: 6443, protocol: "TCP"}
+
 ocp_control_plane_count: 3
+rhosp_lb_api_public_ports:
+- {name: "api-server", port: 6443, protocol: "TCP"}
+- {name: "https", port: 443, protocol: "TCP"}
+- {name: "http", port: 80, protocol: "TCP"}
+- {name: "stats", port: 9000, protocol: "TCP"}
+rhosp_lb_api_internal_ports:
+- {name: "api-int", port: 22623, protocol: "TCP"}
+- {name: "api-server", port: 6443, protocol: "TCP"}
+
 ocp_compute_node_count: 10
+rhosp_lb_app_ports:
+- {name: "https", port: 443, protocol: "TCP"}
+- {name: "http", port: 80, protocol: "TCP"}
+
 
 
 rhosp_compute_node:

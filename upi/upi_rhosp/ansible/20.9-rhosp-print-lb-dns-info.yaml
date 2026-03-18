@@ -24,7 +24,7 @@
     #   name: "{{ rhosp_loadbalancer_prefix }}-public"
     #   vip_network: "{{ rhosp_network }}"
     ansible.builtin.shell: |
-       openstack loadbalancer show {{ rhosp_loadbalancer_prefix }}-public -f json
+       openstack loadbalancer show {{ rhosp_loadbalancer_prefix }}-api-public -f json
     register: rhosp_lb_public_res
 
   - name: "Transform to JSON"

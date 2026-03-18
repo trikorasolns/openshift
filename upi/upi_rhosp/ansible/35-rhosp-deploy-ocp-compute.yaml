@@ -1,0 +1,29 @@
+---
+- name: "Collect information"
+  import_playbook: _common_rhosp.yaml
+  # when: ocp_cluster_id_tag is not defined
+
+- name: "Read installation info from openshift installation"
+  hosts: "{{ ocp_bastion | default('ocp_bastion') | default('localhost') }}"
+  gather_facts: true
+
+  tasks:
+
+  - name: "Print Compute Node server info"
+    ansible.builtin.debug:
+      msg:
+      - "{{ openshift_cluster_install_dir }}/worker.ign"
+      - "/tmp/worker-{{ metadata_json.infraID }}.ign"
+      
+  - name: "Fetch ignition file from OCP installation directory"
+    ansible.builtin.fetch:
+      src: "{{ openshift_cluster_install_dir }}/worker.ign"
+      dest: "/tmp/worker-{{ metadata_json.infraID }}.ign"
+      flat: true
+
+- name: "Deploy Compute Instances"
+  import_playbook: 35.1-rhosp-compute-node-instance.yaml
+
+- name: "Configure Compute on Load Balancer"
+  import_playbook: 35.2-rhosp-load-balancer-members-compute.yaml
+...

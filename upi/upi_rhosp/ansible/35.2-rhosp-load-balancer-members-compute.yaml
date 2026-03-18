@@ -1,0 +1,42 @@
+---
+- name: "Collect information"
+  import_playbook: _common_rhosp.yaml
+
+- name: "Add compute nodes to the Ingress Load Balancer"
+  hosts: "localhost"
+  gather_facts: true
+
+  tasks:
+
+  - name: "Fetch FIP information"
+    include_tasks: tasks/rhosp-fetch-fip-info.yaml
+
+  - name: "Fetch Compute server info"
+    openstack.cloud.server_info:
+      name: "{{ rhosp_compute_node_server_prefix }}-{{ item }}"
+    register: rhosp_compute_server_info
+    loop: "{{ range(1, ocp_compute_node_count + 1) }}"
+
+  - name: "Collect Compute host private IPV4"
+    ansible.builtin.set_fact:
+      rhosp_instance_compute_array: "{{ (rhosp_instance_compute_array | default([])) + [item.servers[0].addresses[rhosp_network] | community.general.json_query(ipv4_fixed_address) | combine ({ 'name' : item.servers[0].name })] }}"
+    vars:
+      ipv4_fixed_address: "[?\"OS-EXT-IPS:type\" == 'fixed' && version == `4`]"
+    loop: "{{ rhosp_compute_server_info.results }}"
+
+  - name: "Print Compute server info"
+    ansible.builtin.debug:
+      msg: 
+      - "rhosp_instance_compute_array: {{ rhosp_instance_compute_array }}"
+
+  - name: "Add member to the APP load-balancer pools"
+    include_tasks: tasks/rhosp-loadbalancer-member.yaml
+    vars:
+      rhosp_lb_member_address: "{{ rhosp_public_lb_pool_members_item.addr }}"
+      rhosp_lb_member_name: "{{ rhosp_public_lb_pool_members_item.name }}"
+      rhosp_lb_member_pool: "{{ rhosp_loadbalancer_pool_name }}-public"
+      rhosp_lb_member_ports: "{{ rhosp_lb_app }}"
+    loop: "{{ rhosp_instance_compute_array }}"
+    loop_control:
+      loop_var: rhosp_public_lb_pool_members_item
+...
