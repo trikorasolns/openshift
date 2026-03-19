@@ -21,13 +21,19 @@
     ansible.builtin.debug:
       var: rhosp_compute_server_info
 
+  # - name: "Collect Compute host private IPV4"
+  #   ansible.builtin.set_fact:
+  #     rhosp_instance_compute_array: "{{ (rhosp_instance_compute_array | default([])) + [item.servers[0].addresses[rhosp_network] | community.general.json_query(ipv4_fixed_address) | combine ({ 'name' : item.servers[0].name })] }}"
+  #   vars:
+  #     ipv4_fixed_address: "[?\"OS-EXT-IPS:type\" == 'fixed' && version == `4`]"
+  #   loop: "{{ rhosp_compute_server_info.results }}"
+
   - name: "Collect Compute host private IPV4"
     ansible.builtin.set_fact:
-      rhosp_instance_compute_array: "{{ (rhosp_instance_compute_array | default([])) + [item.servers[0].addresses[rhosp_network] | community.general.json_query(ipv4_fixed_address) | combine ({ 'name' : item.servers[0].name })] }}"
+      rhosp_instance_compute_array: "{{ (rhosp_instance_compute_array | default([])) + [item.addresses[rhosp_network] | community.general.json_query(ipv4_fixed_address) | combine ({ 'name' : item.name })] }}"
     vars:
       ipv4_fixed_address: "[?\"OS-EXT-IPS:type\" == 'fixed' && version == `4`]"
-    # loop: "{{ rhosp_compute_server_info.results }}"
-    loop: "{{ rhosp_compute_server_info }}"
+    loop: "{{ rhosp_compute_server_info.servers }}"
 
   - name: "Print Compute server collected info"
     ansible.builtin.debug:
