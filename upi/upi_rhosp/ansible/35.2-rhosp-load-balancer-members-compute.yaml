@@ -13,21 +13,25 @@
 
   - name: "Fetch Compute server info"
     openstack.cloud.server_info:
-      name: "{{ rhosp_compute_node_server_prefix }}-{{ item }}"
+      name: "{{ rhosp_compute_node_server_prefix }}*"
     register: rhosp_compute_server_info
-    loop: "{{ range(1, ocp_compute_node_count + 1) }}"
+    # loop: "{{ range(1, ocp_compute_node_count + 1) }}"
+
+  - name: "Print Compute server info"
+    ansible.builtin.debug:
+      var: rhosp_compute_server_info
 
   - name: "Collect Compute host private IPV4"
     ansible.builtin.set_fact:
       rhosp_instance_compute_array: "{{ (rhosp_instance_compute_array | default([])) + [item.servers[0].addresses[rhosp_network] | community.general.json_query(ipv4_fixed_address) | combine ({ 'name' : item.servers[0].name })] }}"
     vars:
       ipv4_fixed_address: "[?\"OS-EXT-IPS:type\" == 'fixed' && version == `4`]"
-    loop: "{{ rhosp_compute_server_info.results }}"
+    # loop: "{{ rhosp_compute_server_info.results }}"
+    loop: "{{ rhosp_compute_server_info }}"
 
-  - name: "Print Compute server info"
+  - name: "Print Compute server collected info"
     ansible.builtin.debug:
-      msg: 
-      - "rhosp_instance_compute_array: {{ rhosp_instance_compute_array }}"
+      var: rhosp_instance_compute_array
 
   - name: "Add member to the APP load-balancer pools"
     include_tasks: tasks/rhosp-loadbalancer-member.yaml
