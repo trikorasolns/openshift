@@ -33,23 +33,24 @@ rhosp_lb_flavor: medium
 
 
 rhosp_compute_node:
-  - id: 1
+  1:
+    flavor: b3-8
+  2:
+    flavor: b3-8
+  3:
+    flavor: b3-8
+  4:
     flavor: c3-16
-  - id: 2
+  5:
     flavor: c3-16
-  - id: 3
+  6:
     flavor: c3-16
-  - id: 4
-    flavor: b3-64
-  - id: 5
-    flavor: b3-64
-  - id: 6
-    flavor: b3-64
-  # 7:
-  #   flavor: c3-16
-  # 8:
-  #   flavor: c3-16
-  # 9:
-  #   flavor: c3-16
-  # 10:
-  #   flavor: c3-16
+  7:
+    flavor: c3-16
+  8:
+    flavor: c3-16
+  9:
+    flavor: c3-16
+  10:
+    flavor: c3-16
+

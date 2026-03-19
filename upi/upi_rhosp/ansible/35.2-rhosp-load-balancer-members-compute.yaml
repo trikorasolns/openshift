@@ -34,8 +34,7 @@
     vars:
       rhosp_lb_member_address: "{{ rhosp_public_lb_pool_members_item.addr }}"
       rhosp_lb_member_name: "{{ rhosp_public_lb_pool_members_item.name }}"
-      rhosp_lb_member_pool: "{{ rhosp_loadbalancer_pool_name }}-public"
-      rhosp_lb_member_ports: "{{ rhosp_lb_app }}"
+      rhosp_lb_member_ports: "{{ rhosp_lb_app_ports }}"
     loop: "{{ rhosp_instance_compute_array }}"
     loop_control:
       loop_var: rhosp_public_lb_pool_members_item

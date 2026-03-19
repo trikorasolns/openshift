@@ -81,34 +81,38 @@
   #     - "rhosp_controlplane_server_info: {{ rhosp_controlplane_server_info.results }}"
   #     - "1: {{ rhosp_controlplane_server_info.results[0] | community.general.json_query('servers[*]') }}"
 
-  - name: "Add members to public load-balancer pools"
+  - name: "Add members to API Public load-balancer pools"
     include_tasks: tasks/rhosp-loadbalancer-member.yaml
     vars:
       rhosp_lb_member_address: "{{ rhosp_public_lb_pool_members_item.addr }}"
       rhosp_lb_member_name: "{{ rhosp_public_lb_pool_members_item.name }}"
-      rhosp_lb_member_pool: "{{ rhosp_loadbalancer_pool_name }}-public"
+      # rhosp_lb_member_pool: "{{ rhosp_loadbalancer_pool_name }}-public"
       rhosp_lb_member_ports: "{{ rhosp_lb_public_ports }}"
     loop: "{{ rhosp_instance_cp_array }}"
     loop_control:
       loop_var: rhosp_public_lb_pool_members_item
 
-  - name: "Add members to private load-balancer pool"
+  - name: "Add members to API Internal load-balancer pool"
     include_tasks: tasks/rhosp-loadbalancer-member.yaml
     vars:
       rhosp_lb_member_address: "{{ rhosp_private_lb_pool_members_item.addr }}"
       rhosp_lb_member_name: "{{ rhosp_private_lb_pool_members_item.name }}"
-      rhosp_lb_member_pool: "{{ rhosp_loadbalancer_pool_name }}-internal"
+      # rhosp_lb_member_pool: "{{ rhosp_loadbalancer_pool_name }}-internal"
       rhosp_lb_member_ports: "{{ rhosp_lb_internal_ports }}"
     loop: "{{ rhosp_instance_cp_array }}"
     loop_control:
       loop_var: rhosp_private_lb_pool_members_item
 
-  - name: "WARNING: Manually add pool to listeners"
-    ansible.builtin.debug:
-      msg:
-      - "Pools aren't associated automatically with the Listener"
-      - "There seems to be no way to automate adding them."
-      - "No options neither on Ansible nor on openstack-cli"
-      - "Must add them manually."
+  - name: "Add members to APP load-balancer pool"
+    include_tasks: tasks/rhosp-loadbalancer-member.yaml
+    vars:
+      rhosp_lb_member_address: "{{ rhosp_app_lb_pool_members_item.addr }}"
+      rhosp_lb_member_name: "{{ rhosp_app_lb_pool_members_item.name }}"
+      # rhosp_lb_member_pool: "{{ rhosp_loadbalancer_pool_name }}-internal"
+      rhosp_lb_member_ports: "{{ rhosp_lb_app_ports }}"
+    loop: "{{ rhosp_instance_cp_array }}"
+    loop_control:
+      loop_var: rhosp_app_lb_pool_members_item
+
 
 ...
